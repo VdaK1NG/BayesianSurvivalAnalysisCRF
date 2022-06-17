@@ -1,0 +1,1116 @@
+---
+title: "DICs"
+output: 
+  html_document:
+    fig_caption: true
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1800px !important;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+<style>
+p.cuadro {
+background-color: #DBDBDB;
+padding: 10px;
+border: 1px solid black;
+margin-left: 50px;
+border-radius: 5px;
+font-style: italic;
+margin-upper: 50px;
+text-align: center
+}
+
+</style>
+
+<div style="text-align: justify">
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, eval=FALSE)
+```
+
+```{r}
+library("haven") # leer datos
+library("dplyr") # manipular datos
+library("parallel")
+library("pracma")
+library("rjags") #rjags
+library("ggplot2") # gráficas
+library("tidyr")
+library("KMsurv")
+library("kableExtra")
+```
+
+```{r}
+data <- read_sav("data.sav")
+datos <- data %>% select(Age, Sex, AetiologyCat, Obesity, Hypertension, Diabetes, Dyslipidemia, Heartdisease, Pneumopathy, CKD, Bblockers, Rifaximin, Lactulose, PPIs, ChilPughclass, MELD, Varices, AlbgDL, Br, INR, Cr, Na, Platelets, ULN, TimeEventACLForTransplant, ACLForTransplant, Hospital)
+
+datos$Sex <- as_factor(datos$Sex)
+datos$AetiologyCat <- as_factor(datos$AetiologyCat)
+datos$Obesity <- as_factor(datos$Obesity)
+datos$Hypertension <- as_factor(datos$Hypertension)
+datos$Pneumopathy <- as_factor(datos$Pneumopathy)
+datos$Diabetes <- as_factor(datos$Diabetes)
+datos$Dyslipidemia <- as_factor(datos$Dyslipidemia)
+datos$Hospital <- as_factor(datos$Hospital)
+datos$CKD <- as_factor(datos$CKD)
+datos$Bblockers <- as_factor(datos$Bblockers)
+datos$Rifaximin <- as_factor(datos$Rifaximin)
+datos$Lactulose <- as_factor(datos$Lactulose)
+datos$PPIs <- as_factor(datos$PPIs)
+datos$ChilPughclass <- as_factor(datos$ChilPughclass)
+datos$Varices <- as_factor(datos$Varices)
+datos$ACLForTransplant <- as_factor(datos$ACLForTransplant)
+
+datos.multi <- datos %>% select(ULN, TimeEventACLForTransplant, ACLForTransplant, Hospital, Age, MELD, AlbgDL, Br, INR, Cr, AetiologyCat, ChilPughclass, Sex, Diabetes, Bblockers)
+datos.multi <- datos.multi %>% drop_na()
+datos.multi <- datos.multi[-c(331,271),]
+
+X0 <- cbind(datos.multi$ULN)
+
+X1 <- model.matrix(~ ULN + Age + MELD + AlbgDL + Br + INR + Cr + AetiologyCat + ChilPughclass + Sex + Diabetes, data = datos.multi)
+X1 <- X1[, -1] # Remove intercept
+
+X1 <- model.matrix(~ ULN + Diabetes, data = datos.multi)
+X1 <- X1[, -1] # Remove intercept
+
+X2 <- model.matrix(~ ULN + ChilPughclass + Diabetes, data = datos.multi)
+X2 <- X2[, -1] # Remove intercept
+
+X3 <- model.matrix(~ ULN + MELD + ChilPughclass + Diabetes, data = datos.multi)
+X3 <- X3[, -1] # Remove intercept
+
+X4 <- model.matrix(~ ULN + MELD + AlbgDL + ChilPughclass + Diabetes, data = datos.multi)
+X4 <- X4[, -1] # Remove intercept
+
+X5 <- model.matrix(~ ULN + MELD + AlbgDL + ChilPughclass + Diabetes + AetiologyCat, data = datos.multi)
+X5 <- X5[, -1] # Remove intercept
+
+X6 <- model.matrix(~ ULN + MELD + AlbgDL + ChilPughclass + Diabetes + AetiologyCat + INR, data = datos.multi)
+X6 <- X6[, -1] # Remove intercept
+
+X7 <- model.matrix(~ ULN + MELD + AlbgDL + ChilPughclass + Diabetes + AetiologyCat + INR + Bblockers, data = datos.multi)
+X7 <- X7[, -c(1, 13)] # Remove intercept
+
+X8 <- model.matrix(~ ULN + MELD + AlbgDL + ChilPughclass + Diabetes + AetiologyCat + INR + Bblockers + Sex, data = datos.multi)
+X8 <- X8[, -c(1, 13)] # Remove intercept
+
+X9 <- model.matrix(~ ULN + MELD + AlbgDL + ChilPughclass + Diabetes + AetiologyCat + INR + Bblockers + Sex + Cr, data = datos.multi)
+X9 <- X9[, -c(1, 13)] # Remove intercept
+
+XS <- model.matrix(~ ULN + MELD + AlbgDL + ChilPughclass + Diabetes + AetiologyCat + INR + Bblockers + Sex + Cr + Br + Age, data = datos.multi)
+XS <- XS[, -c(1, 13)] # Remove intercept
+
+delta <- matrix(c(as.integer(datos.multi$ACLForTransplant == "ACLF"),  as.integer(datos.multi$ACLForTransplant == "Transplant")), ncol = 2)
+time <- datos.multi$TimeEventACLForTransplant
+a <- c(0,25.01,50.01,75.01,100.01,125.01,150.01,200.01,250.01,350.01,455.01,1000.01,2453.001)
+
+int.obs <- matrix(data = NA, nrow = nrow(datos.multi), ncol = length(a) - 1)
+d <- matrix(data = NA, nrow = nrow(datos.multi), ncol = length(a) - 1)
+
+for(i in 1:nrow(datos.multi)) {
+  for (k in 1:(length(a) - 1)) {
+    d[i, k] <- ifelse(time[i] - a[k] > 0, 1, 0) * ifelse(a[k + 1] - time[i] > 0, 1, 0)
+    int.obs[i, k] <- d[i, k] * k
+  }
+}
+
+int.obs <- rowSums(int.obs)
+m <- length(a) - 1
+```
+
+## Weibull
+
+```{r}
+### Weibull
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X0, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta))
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta = rnorm(2))
+}
+
+p.jags <- c("beta", "alpha", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Uni_Weibull.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M0.W.DIC <- dic.samples(m1, 2000, "pD")
+save(M0.W.DIC, file="./DICs/M0_W_DIC.Rdata")
+
+###########################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X1, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X1))
+
+beta.i <- matrix(rnorm(ncol(X1) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M1.W.DIC <- dic.samples(m1, 2000, "pD")
+save(M1.W.DIC, file="./DICs/M1_W_DIC.Rdata")
+
+###########################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X2, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X2))
+
+beta.i <- matrix(rnorm(ncol(X2) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M2.W.DIC <- dic.samples(m1, 2000, "pD")
+save(M2.W.DIC, file="./DICs/M2_W_DIC.Rdata")
+
+###########################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X3, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X3))
+
+beta.i <- matrix(rnorm(ncol(X3) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M3.W.DIC <- dic.samples(m1, 2000, "pD")
+save(M3.W.DIC, file="./DICs/M3_W_DIC.Rdata")
+
+###########################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X4, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X4))
+
+beta.i <- matrix(rnorm(ncol(X4) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M4.W.DIC <- dic.samples(m1, 2000, "pD")
+save(M4.W.DIC, file="./DICs/M4_W_DIC.Rdata")
+
+###########################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X5, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X5))
+
+beta.i <- matrix(rnorm(ncol(X5) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M5.W.DIC <- dic.samples(m1, 2000, "pD")
+save(M5.W.DIC, file="./DICs/M5_W_DIC.Rdata")
+
+###########################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X6, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X6))
+
+beta.i <- matrix(rnorm(ncol(X6) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M6.W.DIC <- dic.samples(m1, 2000, "pD")
+save(M6.W.DIC, file="./DICs/M6_W_DIC.Rdata")
+
+###########################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X7, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X7))
+
+beta.i <- matrix(rnorm(ncol(X7) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M7.W.DIC <- dic.samples(m1, 2000, "pD")
+save(M7.W.DIC, file="./DICs/M7_W_DIC.Rdata")
+
+###########################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X8, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X8))
+
+beta.i <- matrix(rnorm(ncol(X8) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M8.W.DIC <- dic.samples(m1, 2000, "pD")
+save(M8.W.DIC, file="./DICs/M8_W_DIC.Rdata")
+
+###########################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X9, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X9))
+
+beta.i <- matrix(rnorm(ncol(X9) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M9.W.DIC <- dic.samples(m1, 2000, "pD")
+save(M9.W.DIC, file="./DICs/M9_W_DIC.Rdata")
+
+###########################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = XS, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(XS))
+
+beta.i <- matrix(rnorm(ncol(XS) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+MS.W.DIC <- dic.samples(m1, 2000, "pD")
+save(MS.W.DIC, file="./DICs/MS_W_DIC.Rdata")
+
+
+### MPCF
+
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  time = time, X = X0, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta))
+
+x1 <- runif(m, 0, 1)
+x2 <- runif(m, 0, 1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(beta = rnorm(2), lambda = lambda.init)}
+
+p.jags <- c("beta", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Uni_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M0.MPCF.DIC <- dic.samples(m1, 2000, "pD")
+save(M0.MPCF.DIC, file="./DICs/M0_MPCF_DIC.Rdata")
+
+##############################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  time = time, X = X1, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X1))
+
+beta.i <- matrix(rnorm(ncol(X1) * ncol(delta)), ncol=2)
+
+x1 <- runif(m, 0, 1)
+x2 <- runif(m, 0, 1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M1.MPCF.DIC <- dic.samples(m1, 2000, "pD")
+save(M1.MPCF.DIC, file="./DICs/M1_MPCF_DIC.Rdata")
+
+##############################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  time = time, X = X2, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X2))
+
+beta.i <- matrix(rnorm(ncol(X2) * ncol(delta)), ncol=2)
+
+x1 <- runif(m, 0, 1)
+x2 <- runif(m, 0, 1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M2.MPCF.DIC <- dic.samples(m1, 2000, "pD")
+save(M2.MPCF.DIC, file="./DICs/M2_MPCF_DIC.Rdata")
+
+##############################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  time = time, X = X3, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X3))
+
+beta.i <- matrix(rnorm(ncol(X3) * ncol(delta)), ncol=2)
+
+x1 <- runif(m, 0, 1)
+x2 <- runif(m, 0, 1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M3.MPCF.DIC <- dic.samples(m1, 2000, "pD")
+save(M3.MPCF.DIC, file="./DICs/M3_MPCF_DIC.Rdata")
+
+##############################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  time = time, X = X4, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X4))
+
+beta.i <- matrix(rnorm(ncol(X4) * ncol(delta)), ncol=2)
+
+x1 <- runif(m, 0, 1)
+x2 <- runif(m, 0, 1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M4.MPCF.DIC <- dic.samples(m1, 2000, "pD")
+save(M4.MPCF.DIC, file="./DICs/M4_MPCF_DIC.Rdata")
+
+##############################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  time = time, X = X5, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X5))
+
+beta.i <- matrix(rnorm(ncol(X5) * ncol(delta)), ncol=2)
+
+x1 <- runif(m, 0, 1)
+x2 <- runif(m, 0, 1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M5.MPCF.DIC <- dic.samples(m1, 2000, "pD")
+save(M5.MPCF.DIC, file="./DICs/M5_MPCF_DIC.Rdata")
+
+##############################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  time = time, X = X6, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X6))
+
+beta.i <- matrix(rnorm(ncol(X6) * ncol(delta)), ncol=2)
+
+x1 <- runif(m, 0, 1)
+x2 <- runif(m, 0, 1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M6.MPCF.DIC <- dic.samples(m1, 2000, "pD")
+save(M6.MPCF.DIC, file="./DICs/M6_MPCF_DIC.Rdata")
+
+##############################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  time = time, X = X7, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X7))
+
+beta.i <- matrix(rnorm(ncol(X7) * ncol(delta)), ncol=2)
+
+x1 <- runif(m, 0, 1)
+x2 <- runif(m, 0, 1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M7.MPCF.DIC <- dic.samples(m1, 2000, "pD")
+save(M7.MPCF.DIC, file="./DICs/M7_MPCF_DIC.Rdata")
+
+##############################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  time = time, X = X8, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X8))
+
+beta.i <- matrix(rnorm(ncol(X8) * ncol(delta)), ncol=2)
+
+x1 <- runif(m, 0, 1)
+x2 <- runif(m, 0, 1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M8.MPCF.DIC <- dic.samples(m1, 2000, "pD")
+save(M8.MPCF.DIC, file="./DICs/M8_MPCF_DIC.Rdata")
+
+##############################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  time = time, X = X9, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X9))
+
+beta.i <- matrix(rnorm(ncol(X9) * ncol(delta)), ncol=2)
+
+x1 <- runif(m, 0, 1)
+x2 <- runif(m, 0, 1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M9.MPCF.DIC <- dic.samples(m1, 2000, "pD")
+save(M9.MPCF.DIC, file="./DICs/M9_MPCF_DIC.Rdata")
+
+##############################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  time = time, X = XS, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(XS))
+
+beta.i <- matrix(rnorm(ncol(XS) * ncol(delta)), ncol=2)
+
+x1 <- runif(m, 0, 1)
+x2 <- runif(m, 0, 1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+MS.MPCF.DIC <- dic.samples(m1, 2000, "pD")
+save(MS.MPCF.DIC, file="./DICs/MS_MPCF_DIC.Rdata")
+
+### Frailty Weibull
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X0, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta))
+
+i.jags <- function() {
+  list(beta =rnorm(2), lambda = runif(ncol(delta)), alpha = runif(ncol(delta)))
+}
+
+p.jags <- c("beta", "alpha", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Uni_Frailty_Weibull.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M0.W.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M0.W.FR.DIC, file="./DICs/M0_W_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X1, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X1))
+
+beta.i <- matrix(rnorm(ncol(X1) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull_Frailty.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M1.W.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M1.W.FR.DIC, file="./DICs/M1_W_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X2, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X2))
+
+beta.i <- matrix(rnorm(ncol(X2) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull_Frailty.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M2.W.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M2.W.FR.DIC, file="./DICs/M2_W_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X3, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X3))
+
+beta.i <- matrix(rnorm(ncol(X3) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull_Frailty.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M3.W.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M3.W.FR.DIC, file="./DICs/M3_W_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X4, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X4))
+
+beta.i <- matrix(rnorm(ncol(X4) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull_Frailty.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M4.W.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M4.W.FR.DIC, file="./DICs/M4_W_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X5, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X5))
+
+beta.i <- matrix(rnorm(ncol(X5) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull_Frailty.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M5.W.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M5.W.FR.DIC, file="./DICs/M5_W_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X6, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X6))
+
+beta.i <- matrix(rnorm(ncol(X6) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull_Frailty.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M6.W.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M6.W.FR.DIC, file="./DICs/M6_W_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X7, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X7))
+
+beta.i <- matrix(rnorm(ncol(X7) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull_Frailty.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M7.W.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M7.W.FR.DIC, file="./DICs/M7_W_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X8, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X8))
+
+beta.i <- matrix(rnorm(ncol(X8) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull_Frailty.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M8.W.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M8.W.FR.DIC, file="./DICs/M8_W_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X9, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(X9))
+
+beta.i <- matrix(rnorm(ncol(X9) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull_Frailty.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M9.W.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M9.W.FR.DIC, file="./DICs/M9_W_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = XS, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(XS))
+
+beta.i <- matrix(rnorm(ncol(XS) * ncol(delta)), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull_Frailty.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+MS.W.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(MS.W.FR.DIC, file="./DICs/MS_W_FR_DIC.Rdata")
+
+
+### Frailty MPCF
+
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  t = time, X = X0, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta))
+
+x1 <- runif(12, 0, 0.1)
+x2 <- runif(12, 0, 0.1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(beta = rnorm(2), lambda = lambda.init)}
+
+p.jags <- c("beta", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Uni_Frailty_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M0.MPCF.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M0.MPCF.FR.DIC, file="./DICs/M0_MPCF_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  t = time, X = X1, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X1))
+
+beta.i <- matrix(rnorm(ncol(X1) * ncol(delta)), ncol=2)
+
+x1 <- runif(12, 0, 0.1)
+x2 <- runif(12, 0, 0.1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Frailty_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M1.MPCF.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M1.MPCF.FR.DIC, file="./DICs/M1_MPCF_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  t = time, X = X2, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X2))
+
+beta.i <- matrix(rnorm(ncol(X2) * ncol(delta)), ncol=2)
+
+x1 <- runif(12, 0, 0.1)
+x2 <- runif(12, 0, 0.1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Frailty_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M2.MPCF.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M2.MPCF.FR.DIC, file="./DICs/M2_MPCF_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  t = time, X = X3, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X3))
+
+beta.i <- matrix(rnorm(ncol(X3) * ncol(delta)), ncol=2)
+
+x1 <- runif(12, 0, 0.1)
+x2 <- runif(12, 0, 0.1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Frailty_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M3.MPCF.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M3.MPCF.FR.DIC, file="./DICs/M3_MPCF_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  t = time, X = X4, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X4))
+
+beta.i <- matrix(rnorm(ncol(X4) * ncol(delta)), ncol=2)
+
+x1 <- runif(12, 0, 0.1)
+x2 <- runif(12, 0, 0.1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Frailty_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M4.MPCF.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M4.MPCF.FR.DIC, file="./DICs/M4_MPCF_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  t = time, X = X5, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X5))
+
+beta.i <- matrix(rnorm(ncol(X5) * ncol(delta)), ncol=2)
+
+x1 <- runif(12, 0, 0.1)
+x2 <- runif(12, 0, 0.1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Frailty_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M5.MPCF.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M5.MPCF.FR.DIC, file="./DICs/M5_MPCF_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  t = time, X = X6, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X6))
+
+beta.i <- matrix(rnorm(ncol(X6) * ncol(delta)), ncol=2)
+
+x1 <- runif(12, 0, 0.1)
+x2 <- runif(12, 0, 0.1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Frailty_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M6.MPCF.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M6.MPCF.FR.DIC, file="./DICs/M6_MPCF_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  t = time, X = X7, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X7))
+
+beta.i <- matrix(rnorm(ncol(X7) * ncol(delta)), ncol=2)
+
+x1 <- runif(12, 0, 0.1)
+x2 <- runif(12, 0, 0.1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Frailty_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M7.MPCF.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M7.MPCF.FR.DIC, file="./DICs/M7_MPCF_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  t = time, X = X8, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X8))
+
+beta.i <- matrix(rnorm(ncol(X8) * ncol(delta)), ncol=2)
+
+x1 <- runif(12, 0, 0.1)
+x2 <- runif(12, 0, 0.1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Frailty_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M8.MPCF.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M8.MPCF.FR.DIC, file="./DICs/M8_MPCF_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  t = time, X = X9, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(X9))
+
+beta.i <- matrix(rnorm(ncol(X9) * ncol(delta)), ncol=2)
+
+x1 <- runif(12, 0, 0.1)
+x2 <- runif(12, 0, 0.1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Frailty_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+M9.MPCF.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(M9.MPCF.FR.DIC, file="./DICs/M9_MPCF_FR_DIC.Rdata")
+
+############################################################################################################################
+
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  t = time, X = XS, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(XS))
+
+beta.i <- matrix(rnorm(ncol(XS) * ncol(delta)), ncol=2)
+
+x1 <- runif(12, 0, 0.1)
+x2 <- runif(12, 0, 0.1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Frailty_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+MS.MPCF.FR.DIC <- dic.samples(m1, 2000, "pD") 
+save(MS.MPCF.FR.DIC, file="./DICs/MS_MPCF_FR_DIC.Rdata")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
