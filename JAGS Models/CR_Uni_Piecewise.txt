@@ -2,8 +2,8 @@ model {
   for(i in 1:n) {
     for(k in 1:Nrisks) {
         for(j in 1:int.obs[i]) {
-       cond[i, j, k] <- step(time[i] - a[j + 1])
-       HH[i, j, k] <- cond[i, j, k] * (a[j + 1] - a[j]) * lambda[j, k] + (1 - cond[i, j, k]) * (time[i] - a[j]) * lambda[j, k]
+       cond[i, j, k] <- step(t[i] - a[j + 1])
+       HH[i, j, k] <- cond[i, j, k] * (a[j + 1] - a[j]) * lambda[j, k] + (1 - cond[i, j, k]) * (t[i] - a[j]) * lambda[j, k]
       }
     # Cumulative hazard function
     H[i, k] <- sum(HH[i, 1:int.obs[i], k])
