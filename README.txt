@@ -1,4 +1,4 @@
-INTROUDCTION
+INTRODUCTION
 
 Hello!
 This Github contains the R files corresponding to the Master's Thesis "Bayesian Survival Analysis of Acute-On-Chronic Liver Failure in Clinically Stable Outpatients with Cirrhosis", which was developed in colaboration with INCLIVA for the Master of Biostatistics of University of Valencia, Spain. If you have any doubt, do not hesitate to contact me at csebap@hotmail.com. If you would like to get the original dataset, contact the corresponding author Juan Antonio Carbonell at jacarbonell@incliva.es.
