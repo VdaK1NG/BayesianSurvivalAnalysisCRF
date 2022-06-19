@@ -182,12 +182,12 @@ fig1 <- ggplot(data=datos0) +
   geom_vline(xintercept = 1, linetype="dashed", col="blue") +
   geom_vline(xintercept = 8, linetype="dashed", col="blue") +
   xlab("Time") + ylab("Individual") + labs(subtitle="a) Swimming Plot") +
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 ini <- c(0,1,3,2,0.5,6.5,1.5)   # RECRUITMENT DATES
 fin <- c(3.5,8,7,6.5,3.5,8,6.5) # FINAL DATE
@@ -211,12 +211,12 @@ fig2 <- ggplot(data=datos1) +
   geom_vline(xintercept = 0, linetype="dashed", col="blue") +
   geom_vline(xintercept = 7, linetype="dashed", col="blue") +
   xlab("Time under study") + ylab("Individual") + labs(subtitle="b) Swimming Plot Study Time") +
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 grid.arrange(fig1, fig2, ncol=2)
 ```
@@ -228,13 +228,13 @@ grid.arrange(fig1, fig2, ncol=2)
 ```{r}
 fig1 <- ggplot(data = datos.multi) +
   geom_density(aes(x=TimeEventACLForTransplant), col = "black", fill = "black", alpha=0.3, cex=1.05) +
-  labs(y= "Density", x = "Time", subtitle = "a) Global distribution") + #cambiar etiquetas ejes
+  labs(y= "Density", x = "Time", subtitle = "a) Global distribution") + #CHANGE AXIS TAGS
   ylim(0,0.004) +
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
         legend.text = element_text(size=8, colour = "black"))
 
 fig2 <- ggplot(data = datos.multi %>% group_by(Hospital)) +
@@ -242,12 +242,12 @@ fig2 <- ggplot(data = datos.multi %>% group_by(Hospital)) +
   scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) + 
   scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
   ylim(0,0.004) +
-  labs(y= "Density", x = "Time", subtitle = "b) Distribution per Hospital") + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+  labs(y= "Density", x = "Time", subtitle = "b) Distribution per Hospital") + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
         legend.text = element_text(size=8, colour = "black"))
 
 grid.arrange(fig1, fig2, ncol=2)
@@ -260,105 +260,105 @@ fig1 <- ggplot(datos.multi %>% group_by(Hospital), aes(TimeEventACLForTransplant
       geom_boxplot() +
       coord_flip() +
       scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
-      labs(title="TEAOT Boxplot", x = "TEAOT", y = "Hospital") + #cambiar etiquetas ejes
-      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-            axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-            axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-            panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+      labs(title="TEAOT Boxplot", x = "TEAOT", y = "Hospital") + #CHANGE AXIS TAGS
+      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+            axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+            axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+            panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
             axis.ticks.y=element_blank(), #quitar etiquetas eje y
-            legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-            legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+            legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+            legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 fig2 <- ggplot(datos.multi %>% group_by(Hospital), aes(ULN, fill=Hospital)) +
   geom_boxplot() +
   coord_flip() +
   scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
-  labs(title="ULN Boxplot", x = "ULN", y = "Hospital") + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+  labs(title="ULN Boxplot", x = "ULN", y = "Hospital") + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
         axis.ticks.y=element_blank(), #quitar etiquetas eje y
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 fig3 <- ggplot(datos.multi %>% group_by(Hospital), aes(MELD, fill=Hospital)) +
   geom_boxplot() +
   coord_flip() +
   scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
-  labs(title="MELD Boxplot", x = "MELD", y = "Hospital") + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+  labs(title="MELD Boxplot", x = "MELD", y = "Hospital") + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
         axis.ticks.y=element_blank(), #quitar etiquetas eje y
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 fig4 <- ggplot(datos.multi %>% group_by(Hospital), aes(AlbgDL, fill=Hospital)) +
   geom_boxplot() +
   coord_flip() +
   scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
-  labs(title="AlbgDL Boxplot", x = "AlbgDL", y = "Hospital") + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+  labs(title="AlbgDL Boxplot", x = "AlbgDL", y = "Hospital") + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
         axis.ticks.y=element_blank(), #quitar etiquetas eje y
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 fig5 <- ggplot(datos.multi %>% group_by(Hospital), aes(INR, fill=Hospital)) +
   geom_boxplot() +
   coord_flip() +
   scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
-  labs(title="INR Boxplot", x = "INR", y = "Hospital") + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+  labs(title="INR Boxplot", x = "INR", y = "Hospital") + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
         axis.ticks.y=element_blank(), #quitar etiquetas eje y
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 fig6 <- ggplot(datos.multi %>% group_by(Hospital), aes(Br, fill=Hospital)) +
   geom_boxplot() +
   coord_flip() +
   scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
-  labs(title="Br Boxplot", x = "Br", y = "Hospital") + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+  labs(title="Br Boxplot", x = "Br", y = "Hospital") + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
         axis.ticks.y=element_blank(), #quitar etiquetas eje y
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 fig7 <- ggplot(datos.multi %>% group_by(Hospital), aes(Cr, fill=Hospital)) +
   geom_boxplot() +
   coord_flip() +
   scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
-  labs(title="Cr Boxplot", x = "Cr", y = "Hospital") + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+  labs(title="Cr Boxplot", x = "Cr", y = "Hospital") + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
         axis.ticks.y=element_blank(), #quitar etiquetas eje y
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 fig8 <- ggplot(datos.multi %>% group_by(Hospital), aes(Age, fill=Hospital)) +
   geom_boxplot() +
   coord_flip() +
   scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
-  labs(title="Age Boxplot", x = "Age", y = "Hospital") + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+  labs(title="Age Boxplot", x = "Age", y = "Hospital") + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
         axis.ticks.y=element_blank(), #quitar etiquetas eje y
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 grid.arrange(fig1, fig2, fig3, fig4, fig5, fig6, fig7, fig8, ncol=3)
 ```
@@ -370,85 +370,85 @@ fig1 <- ggplot(datos.multi,
                aes(Hospital, fill=Hospital)) +
   scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
   geom_bar(position=position_dodge()) +
-  labs(title="Hospital Distribution", y= "", x = "") + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+  labs(title="Hospital Distribution", y= "", x = "") + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 fig2 <- ggplot(datos.multi, 
                aes(Hospital, fill=ACLForTransplant)) + 
   scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA"), name = "AOT") +
   geom_bar(position=position_dodge()) +
-  labs(title="AOT Distribution", y= "", x = "") + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+  labs(title="AOT Distribution", y= "", x = "") + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 fig3 <- ggplot(datos.multi %>% group_by(Hospital), 
               aes(Hospital, fill=Sex)) + 
   scale_fill_manual(values=c("#4169E1","#DB7093")) +
   geom_bar(position=position_dodge()) +
-  labs(title="Sex Distribution", y= "", x = "") + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+  labs(title="Sex Distribution", y= "", x = "") + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 fig4 <- ggplot(datos.multi %>% group_by(Hospital), 
                aes(Hospital, fill=Diabetes)) + 
   scale_fill_manual(values=c("#4169E1","#DB7093")) +
   geom_bar(position=position_dodge()) +
-  labs(title="Diabetes Distribution", y= "", x = "") + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+  labs(title="Diabetes Distribution", y= "", x = "") + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 fig5 <- ggplot(datos.multi %>% group_by(Hospital), 
                aes(Hospital, fill=AetiologyCat)) + 
   scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA", "#8A2BE2", "#DAA520"), name = "Aet. Cat.") +
   geom_bar(position=position_dodge()) +
-  labs(title="Aet. Cat. Distribution", y= "", x = "") + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+  labs(title="Aet. Cat. Distribution", y= "", x = "") + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 fig6 <- ggplot(datos.multi %>% group_by(Hospital), 
                aes(Hospital, fill=ChilPughclass)) + 
   scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA"), name="Chil. Pugh.") +
   geom_bar(position=position_dodge()) +
-  labs(title="Chil. Pugh. Distribution", y= "", x = "") + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+  labs(title="Chil. Pugh. Distribution", y= "", x = "") + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 fig7 <- ggplot(datos.multi %>% group_by(Hospital), 
                aes(Hospital, fill=Bblockers)) + 
   scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA"), name="Bblockers") +
   geom_bar(position=position_dodge()) +
-  labs(title="Bblockers Distribution", y= "", x = "") + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+  labs(title="Bblockers Distribution", y= "", x = "") + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 
 
 grid.arrange(arrangeGrob(fig3, fig4, fig7, ncol=3), arrangeGrob(fig1, fig2, ncol=2), arrangeGrob(fig5, fig6, ncol=2), ncol=1)
@@ -469,24 +469,24 @@ Lim <- k + 3 * sqrt(k * 2) # LIMIT
 ggplot(ma, aes(x=x1, y=y2, col=Hospital)) +
  geom_point(alpha=0.5, shape=20, size=3) +
  scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
- geom_line(aes(y=Lim, x=1:725),colour="purple") + #Añadir línea horizontal
- geom_text(aes(label=1:725),hjust=-0.5, vjust=0, size=3) + #Añadir número a cada punto
- labs(title="", y= "Mahalanobis distance", x = "Index") + #cambiar etiquetas ejes
- theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-       axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-       axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-       panel.border = element_rect(colour = "black", fill=NA, size=0.3)) #cambiar bordes grafico
+ geom_line(aes(y=Lim, x=1:725),colour="purple") + # ADD HORIZONTAL LINE
+ geom_text(aes(label=1:725),hjust=-0.5, vjust=0, size=3) + # ADD NUMBERS TO POINTS
+ labs(title="", y= "Mahalanobis distance", x = "Index") + #CHANGE AXIS TAGS
+ theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+       axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+       axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+       panel.border = element_rect(colour = "black", fill=NA, size=0.3)) # CHANGE BORDERS
 
 ggplot(ma, aes(x=x1, y=y2, col=Event)) +
  geom_point(alpha=0.5, shape=20, size=3) +
  scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
- geom_line(aes(y=Lim, x=1:725),colour="purple") + #Añadir línea horizontal
- geom_text(aes(label=1:725),hjust=-0.5, vjust=0, size=3) + #Añadir número a cada punto
- labs(title="", y= "Mahalanobis distance", x = "Index") + #cambiar etiquetas ejes
- theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-       axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-       axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-       panel.border = element_rect(colour = "black", fill=NA, size=0.3)) #cambiar bordes grafico
+ geom_line(aes(y=Lim, x=1:725),colour="purple") + # ADD HORIZONTAL LINE
+ geom_text(aes(label=1:725),hjust=-0.5, vjust=0, size=3) + # ADD NUMBERS TO POINTS
+ labs(title="", y= "Mahalanobis distance", x = "Index") + #CHANGE AXIS TAGS
+ theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+       axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+       axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+       panel.border = element_rect(colour = "black", fill=NA, size=0.3)) # CHANGE BORDERS
 ```
 
 ### Figure 3.6
@@ -502,13 +502,13 @@ colnames(pmat) <- c("Age", "MELD", "AlbgDL", "Br", "INR", "Cr", "ULN", "TEAOT")
 
 # PLOT DATA
 ggcorrplot(cor, p.mat = pmat, show.diag = F, type="lower", lab=TRUE, lab_size=6, tl.cex = 12,
-          colors = c("#4169E1", "white", "#DB7093")) + #cambiar etiquetas ejes
+          colors = c("#4169E1", "white", "#DB7093")) + #CHANGE AXIS TAGS
 labs(x="", y="") +
 theme(panel.background = element_rect(fill = "lightgray",colour = "lightgray"),
-     plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-     axis.title.x = element_text(size=0, face="bold", colour = "black"), #cambiar estilo eje x
-     axis.title.y = element_text(size=0, face="bold", colour = "black"), #cambiar estilo eje y
-     panel.border = element_rect(colour = "black", fill=NA, size=0.3)) #cambiar bordes grafico
+     plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+     axis.title.x = element_text(size=0, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+     axis.title.y = element_text(size=0, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+     panel.border = element_rect(colour = "black", fill=NA, size=0.3)) # CHANGE BORDERS
 ```
 
 ### Figure 3.7
@@ -593,12 +593,12 @@ ggplot(data = rhat) +
   geom_hline(yintercept = 1.1, col="black") +
   labs(x="Parameter Index", y="PSRF") +
   labs(title="PSRF values for the parameters estimated") +
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 ```
 
 #### Figure 4.2
@@ -649,12 +649,12 @@ fig1 <- ggplot() +
   labs(x="Time (days)", y="", subtitle="a) Log Baseline Hazard Function") + 
   xlim(0,2500) + 
   scale_linetype_manual(values = c("solid")) + 
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
         legend.position = c(0.8, 0.8)) # cambiar posicion leyenda  
 ```
 
@@ -705,12 +705,12 @@ fig2 <- ggplot() +
   ylim(0,1)+
   xlim(0,2500) + 
   scale_linetype_manual(values = c("solid")) + 
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
         legend.position = c(0.2, 0.2)) # cambiar posicion leyenda        
 
 grid.arrange(fig1, fig2, ncol=2)
@@ -909,12 +909,12 @@ ggplot(data = rhat) +
   geom_hline(yintercept = 1.1, col="black") +
   labs(x="Parameter Index", y="PSRF") +
   labs(title="PSRF values for the parameters estimated") +
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 ```
 
 #### Figure 4.5
@@ -964,12 +964,12 @@ fig1 <- ggplot() +
   geom_line(data=df1, mapping=aes(x=time, y=h0med, colour="ACLF"), size=1) + 
   labs(x="Time (days)", y="", subtitle = "a)Log Baseline Hazard Function") +
   scale_linetype_manual(values = c("solid")) + 
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
         legend.position = c(0.9, 0.8)) # cambiar posicion leyenda      
 ```
 
@@ -1052,12 +1052,12 @@ fig2 <- ggplot() +
   ylim(0,1)+
   xlim(0,2500) + 
   scale_linetype_manual(values = c("solid")) + 
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
         legend.position = c(0.2, 0.2)) # cambiar posicion leyenda        
 
 grid.arrange(fig1, fig2, ncol=2) 
@@ -1098,12 +1098,12 @@ ggplot(data = rhat) +
   geom_hline(yintercept = 1.1, col="black") +
   labs(x="Parameter Index", y="PSRF")
   labs(title="PSRF values for the parameters estimated") +
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 ```
 
 #### Figure 4.7
@@ -1154,12 +1154,12 @@ fig1 <- ggplot() +
   labs(x="Time (days)", y="", subtitle="a) Log Baseline Hazard Function") + 
   xlim(0,2500) + 
   scale_linetype_manual(values = c("solid")) + 
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
         legend.position = c(0.8, 0.8)) # cambiar posicion leyenda  
 ```
 
@@ -1210,12 +1210,12 @@ fig2 <- ggplot() +
   ylim(0,1)+
   xlim(0,2500) + 
   scale_linetype_manual(values = c("solid")) + 
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
         legend.position = c(0.2, 0.2)) # cambiar posicion leyenda        
 
 grid.arrange(fig1, fig2, ncol=2)
@@ -1238,55 +1238,55 @@ fig1.1 <- ggplot(data=datos.multi %>% filter(Hospital=="RFH")) +
     geom_point(aes(x=1:141, y=w.w, col=Hospital)) +
     scale_colour_manual(values=c("#4169E1")) +
     labs(subtitle = "a) RFH Weibull Fr.") + ylim(0.9, 1.05) + ylab("w[i]") + xlab("Patient ID") +
-    theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-          axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-          axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-          panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-          legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-          legend.text = element_text(size=8, colour = "black"),legend.position ="none") # cambiar texto leyenda   
+    theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+          axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+          axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+          panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+          legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+          legend.text = element_text(size=8, colour = "black"),legend.position ="none") # CHANGE LEGEND TEXT   
     
 fig1.2 <- ggplot(data=datos.multi %>% filter(Hospital=="KCH")) +
   geom_point(aes(x=1:444, y=w.w, col=Hospital)) +
   scale_colour_manual(values=c("#DB7093")) +
   labs(subtitle = "b) KCH Weibull Fr.") + ylim(0.9, 1.05) + ylab("w[i]") + xlab("Patient ID") +
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"),legend.position ="none") # cambiar texto leyenda   
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"),legend.position ="none") # CHANGE LEGEND TEXT   
 
 fig1.3 <- ggplot(data=datos.multi %>% filter(Hospital=="HCUV")) +
   geom_point(aes(x=1:140, y=w.w, col=Hospital)) +
   scale_colour_manual(values=c("#66CDAA")) +
   labs(subtitle = "c) HCUV Weibull Fr.") + ylim(0.9, 1.05) + ylab("w[i]") + xlab("Patient ID") + 
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"),legend.position ="none") # cambiar texto leyenda  
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"),legend.position ="none") # CHANGE LEGEND TEXT  
     
 fig1 <- ggplot(data = datos.multi) +
   geom_density(aes(w.w), alpha=0.25, cex=1.05, col="black", fill="black") + xlab("w[i]") + ylab("Density") + xlim(0.85, 1.1) + labs(tag="d)") +
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), legend.position = 0, # cambiar texto leyenda   
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), legend.position = 0, # CHANGE LEGEND TEXT   
         plot.tag.position = c(0,1), plot.tag = element_text(vjust = 1.5, hjust = -4))   
     
 fig2 <- ggplot(data = datos.multi) +
       geom_density(aes(w.w, fill=Hospital, col=Hospital), alpha=0.25, cex=1.05) + xlab("w[i]") + ylab("Density") + xlim(0.85, 1.1) +
       scale_colour_manual(values=c("#4169E1", "#66CDAA","#DB7093")) +
       scale_fill_manual(values=c("#4169E1", "#66CDAA","#DB7093")) + labs(tag="e)") +
-      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-            axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-            axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-            panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-            legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-            legend.text = element_text(size=8, colour = "black"),legend.position = c(0.9, 0.7), # cambiar texto leyenda   
+      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+            axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+            axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+            panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+            legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+            legend.text = element_text(size=8, colour = "black"),legend.position = c(0.9, 0.7), # CHANGE LEGEND TEXT   
         plot.tag.position = c(0,1), plot.tag = element_text(vjust = 1.5, hjust = -3.5))
 
 
@@ -1360,12 +1360,12 @@ ggplot(data = rhat) +
   geom_hline(yintercept = 1.1, col="black") +
   labs(x="Parameter Index", y="PSRF") +
   labs(title="PSRF values for the parameters estimated") +
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT
 ```
 
 #### Figure 4.10
@@ -1416,12 +1416,12 @@ fig1 <- ggplot() +
   geom_line(data=df5, mapping=aes(x=time, y=h0med, colour="ACLF"), size=1) + 
   labs(x="Time (days)", y="", subtitle = "a)Log Baseline Hazard Function") +
   scale_linetype_manual(values = c("solid")) + 
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
         legend.position = c(0.9, 0.8)) # cambiar posicion leyenda      
 ```
 
@@ -1504,12 +1504,12 @@ fig2 <- ggplot() +
   ylim(0,1)+
   xlim(0,2500) + 
   scale_linetype_manual(values = c("solid")) + 
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
         legend.position = c(0.2, 0.2)) # cambiar posicion leyenda        
 
 grid.arrange(fig1, fig2, ncol=2) 
@@ -1522,55 +1522,55 @@ fig1.1 <- ggplot(data=datos.multi %>% filter(Hospital=="RFH")) +
     geom_point(aes(x=1:141, y=w.mpcf, col=Hospital)) +
     scale_colour_manual(values=c("#4169E1")) +
     labs(subtitle = "a) RFH MPCF Fr.") + ylim(0.9, 1.05) + ylab("w[i]") + xlab("Patient ID") +
-    theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-          axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-          axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-          panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-          legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-          legend.text = element_text(size=8, colour = "black"),legend.position ="none") # cambiar texto leyenda   
+    theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+          axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+          axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+          panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+          legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+          legend.text = element_text(size=8, colour = "black"),legend.position ="none") # CHANGE LEGEND TEXT   
     
 fig1.2 <- ggplot(data=datos.multi %>% filter(Hospital=="KCH")) +
   geom_point(aes(x=1:444, y=w.mpcf, col=Hospital)) +
   scale_colour_manual(values=c("#DB7093")) +
   labs(subtitle = "b) KCH MPCF Fr.") + ylim(0.9, 1.05) + ylab("w[i]") + xlab("Patient ID") +
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"),legend.position ="none") # cambiar texto leyenda   
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"),legend.position ="none") # CHANGE LEGEND TEXT   
 
 fig1.3 <- ggplot(data=datos.multi %>% filter(Hospital=="HCUV")) +
   geom_point(aes(x=1:140, y=w.mpcf, col=Hospital)) +
   scale_colour_manual(values=c("#66CDAA")) +
   labs(subtitle = "c) HCUV MPCF Fr.") + ylim(0.9, 1.05) + ylab("w[i]") + xlab("Patient ID") + 
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"),legend.position ="none") # cambiar texto leyenda  
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"),legend.position ="none") # CHANGE LEGEND TEXT  
     
 fig1 <- ggplot(data = datos.multi) +
   geom_density(aes(w.mpcf), alpha=0.25, cex=1.05, col="black", fill="black") + xlab("w[i]") + ylab("Density") + xlim(0.85, 1.1) + labs(tag="d)") +
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), legend.position = 0, # cambiar texto leyenda   
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), legend.position = 0, # CHANGE LEGEND TEXT   
         plot.tag.position = c(0,1), plot.tag = element_text(vjust = 1.5, hjust = -4))   
     
 fig2 <- ggplot(data = datos.multi) +
       geom_density(aes(w.mpcf, fill=Hospital, col=Hospital), alpha=0.25, cex=1.05) + xlab("w[i]") + ylab("Density") + xlim(0.85, 1.1) +
       scale_colour_manual(values=c("#4169E1", "#66CDAA","#DB7093")) +
       scale_fill_manual(values=c("#4169E1", "#66CDAA","#DB7093")) + labs(tag="e)") +
-      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-            axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-            axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-            panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-            legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-            legend.text = element_text(size=8, colour = "black"),legend.position = c(0.9, 0.7), # cambiar texto leyenda   
+      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+            axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+            axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+            panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+            legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+            legend.text = element_text(size=8, colour = "black"),legend.position = c(0.9, 0.7), # CHANGE LEGEND TEXT   
         plot.tag.position = c(0,1), plot.tag = element_text(vjust = 1.5, hjust = -3.5))
 
 grid.arrange(arrangeGrob(fig1.1, fig1.2, fig1.3, ncol=3), arrangeGrob(fig1, fig2, ncol=2), ncol=1)
@@ -1620,12 +1620,12 @@ ggplot(data = rhat) +
   geom_hline(yintercept = 1.1, col="black") +
   labs(x="Parameter Index", y="PSRF") +
   labs(title="PSRF values for the parameters estimated") +
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda  
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT  
 ```
 
 ### MPCF
@@ -1663,12 +1663,12 @@ ggplot(data = rhat) +
   geom_hline(yintercept = 1.1, col="black") +
   labs(x="Parameter Index", y="PSRF") +
   labs(title="PSRF values for the parameters estimated") +
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda  
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black")) # CHANGE LEGEND TEXT  
 ```
 
 ## Discussion
@@ -1705,49 +1705,49 @@ beta2.HR <- data.frame("Model"= beta2.results$Model, "Mean" = exp(beta2.results$
 fig1 <- ggplot(beta1.results, aes(x=Model, y=Mean, col=Model)) + 
   geom_point() + ylim(0, 1.5) + labs(subtitle="a) Regression Coefficients ACLF") +
   scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA", "black")) +
-  geom_pointrange(aes(ymin=Lower, ymax=Upper)) + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda
+  geom_pointrange(aes(ymin=Lower, ymax=Upper)) + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT
         legend.pos = c(0.9, 0.2))
 
 fig2 <- ggplot(beta2.results, aes(x=Model, y=Mean, col=Model)) + 
   geom_point() + ylim(0, 1.5) + labs(subtitle="b) Regression Coefficients Transplant") +
   scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA", "black")) +
-  geom_pointrange(aes(ymin=Lower, ymax=Upper)) + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda
+  geom_pointrange(aes(ymin=Lower, ymax=Upper)) + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT
         legend.pos = c(0.9, 0.8))
 
 fig3 <- ggplot(beta1.HR, aes(x=Model, y=Mean, col=Model)) + 
   geom_point(cex=2) + ylim(0, 3.5) + labs(subtitle="a) Hazards Ratio ACLF") +
   scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA", "black")) +
-  geom_pointrange(aes(ymin=Lower, ymax=Upper)) + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda
+  geom_pointrange(aes(ymin=Lower, ymax=Upper)) + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT
         legend.pos = c(0.9, 0.2)) # change legen position
 
 fig4 <- ggplot(beta2.HR, aes(x=Model, y=Mean, col=Model)) + 
   geom_point(cex=2) + ylim(0, 3.5) + labs(subtitle="b) Hazards Ratio Transplant") + 
   scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA", "black")) +
-  geom_pointrange(aes(ymin=Lower, ymax=Upper)) + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda
+  geom_pointrange(aes(ymin=Lower, ymax=Upper)) + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT
         legend.pos = c(0.9, 0.8)) # change legen position
 
 grid.arrange(fig1, fig2, fig3, fig4, ncol=2)
@@ -1764,12 +1764,12 @@ fig1 <- ggplot() +
   geom_line(data=log.h0.Trp.W.df, mapping=aes(x=time, y=log.h0med,colour="Transplant"), size=1) + 
   labs(x="Time (days)", y="", subtitle="a) Log Baseline Hazard Function Weibull") + ylim(-18,-6) +
   scale_linetype_manual(values = c("solid")) + 
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
         legend.position = c(0.9, 0.2)) # cambiar posicion leyenda 
 
 fig2 <- ggplot() + 
@@ -1780,12 +1780,12 @@ fig2 <- ggplot() +
   geom_line(data=df1, mapping=aes(x=time, y=h0med, colour="ACLF"), size=1) + 
   labs(x="Time (days)", y="", subtitle = "b)Log Baseline Hazard Function MPCF") + ylim(-18,-6) +
   scale_linetype_manual(values = c("solid")) + 
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
         legend.position = c(0.9, 0.85)) # cambiar posicion leyenda   
 
 fig3 <- ggplot() + 
@@ -1797,12 +1797,12 @@ fig3 <- ggplot() +
   labs(x="Time (days)", y="", subtitle="c) Log Baseline Hazard Function Weibull Frailty") + 
   ylim(-18,-6) +
   scale_linetype_manual(values = c("solid")) + 
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
         legend.position = c(0.9, 0.2)) # cambiar posicion leyenda 
 
 fig4 <- ggplot() + 
@@ -1813,12 +1813,12 @@ fig4 <- ggplot() +
   geom_line(data=df5, mapping=aes(x=time, y=h0med, colour="ACLF"), size=1) + ylim(-18,-6) +
   labs(x="Time (days)", y="", subtitle = "d)Log Baseline Hazard Function MPCF Frailty") +
   scale_linetype_manual(values = c("solid")) + 
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
         legend.position = c(0.9, 0.85)) # cambiar posicion leyenda  
 
 grid.arrange(fig1, fig2, fig3, fig4, ncol=2)
@@ -1838,12 +1838,12 @@ fig1 <- ggplot() +
       ylim(0,1)+
       xlim(0,2500) + 
       scale_linetype_manual(values = c("solid")) + 
-      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-            axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-            axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-            panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-            legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-            legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+            axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+            axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+            panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+            legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+            legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
             legend.position = c(0.2, 0.2)) # cambiar posicion leyenda        
     
     fig2 <- ggplot() + 
@@ -1856,12 +1856,12 @@ fig1 <- ggplot() +
       ylim(0,1)+
       xlim(0,2500) + 
       scale_linetype_manual(values = c("solid")) + 
-      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-            axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-            axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-            panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-            legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-            legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+            axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+            axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+            panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+            legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+            legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
             legend.position = c(0.2, 0.2)) # cambiar posicion leyenda        
     
     fig3 <- ggplot() + 
@@ -1874,12 +1874,12 @@ fig1 <- ggplot() +
       ylim(0,1)+
       xlim(0,2500) + 
       scale_linetype_manual(values = c("solid")) + 
-      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-            axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-            axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-            panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-            legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-            legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+            axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+            axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+            panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+            legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+            legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
             legend.position = c(0.2, 0.2)) # cambiar posicion leyenda       
     
     
@@ -1893,12 +1893,12 @@ fig1 <- ggplot() +
       ylim(0,1)+
       xlim(0,2500) + 
       scale_linetype_manual(values = c("solid")) + 
-      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-            axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-            axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-            panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-            legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-            legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+            axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+            axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+            panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+            legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+            legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
             legend.position = c(0.2, 0.2)) # cambiar posicion leyenda    
     
     grid.arrange(fig1, fig3, fig2, fig4, ncol=2)
@@ -1912,24 +1912,24 @@ fig1 <- ggplot(data = datos.multi) +
     labs(subtitle = "a) Weibull") +
     scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
     scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
-    theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-          axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-          axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-          panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-          legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-          legend.text = element_text(size=8, colour = "black"),legend.position = c(0.9, 0.8)) # cambiar texto leyenda     
+    theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+          axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+          axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+          panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+          legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+          legend.text = element_text(size=8, colour = "black"),legend.position = c(0.9, 0.8)) # CHANGE LEGEND TEXT     
   
 fig2 <- ggplot(data = datos.multi) +
   geom_density(aes(w.mpcf, fill=Hospital, col=Hospital), alpha=0.25, cex=1.05) + xlab("w[i]") + ylab("Density") + xlim(0.85, 1.1) +
   labs(subtitle = "b) MPCF") +
   scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
   scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"),legend.position = c(0.9, 0.8)) # cambiar texto leyenda     
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"),legend.position = c(0.9, 0.8)) # CHANGE LEGEND TEXT     
 
 grid.arrange(fig1, fig2, ncol=2)
 ```
@@ -1994,13 +1994,13 @@ ggplot(beta1.results, aes(x=Covariate, y=Mean, col=Model)) +
   facet_grid(cols=vars(Model)) +
   geom_point() +
   scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA", "black")) +
-  geom_pointrange(aes(ymin=Lower, ymax=Upper)) + #cambiar etiquetas ejes
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda
+  geom_pointrange(aes(ymin=Lower, ymax=Upper)) + #CHANGE AXIS TAGS
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT
         legend.pos = c(0.9, 0.2),
         axis.text.x = element_text(angle = 75, vjust = 1, hjust=1))    
 ```
@@ -2042,12 +2042,12 @@ dic.models$Best[c(11,22,30,43)] <- "Yes"
 
 ggplot(data = dic.models) +
   geom_point(aes(y=DIC, x=Model, col=Type, size=Best)) + scale_size_manual(values=c(4,7)) +
-  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
-        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
-        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
-        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
-        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
-        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), # CHANGE TITLE STYLE
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), # CHANGE X AXIS STYLE
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), # CHANGE Y AXIS STYLE
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), # CHANGE BORDERS
+        legend.title = element_text(size=10, face="bold", colour = "black"), # CHANGE LEGEND TITLE
+        legend.text = element_text(size=8, colour = "black"), # CHANGE LEGEND TEXT     
         legend.position = c(0.8, 0.8)) # cambiar posicion leyenda    
 ```
 
