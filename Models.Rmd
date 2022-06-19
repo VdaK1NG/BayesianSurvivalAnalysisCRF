@@ -1,0 +1,235 @@
+---
+title: "Models"
+author: "Pablo Escobar Hernández"
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1800px !important;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+<div style="text-align: justify">
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, eval=FALSE)
+```
+
+```{r}
+library("haven") # leer datos
+library("dplyr") # manipular datos
+library("parallel")
+library("pracma")
+library("rjags") #rjags
+library("ggplot2") # gráficas
+library("tidyr")
+library("KMsurv")
+library("kableExtra")
+```
+
+## Preparing Data
+
+```{r}
+data <- read_sav("data.sav")
+datos <- data %>% select(Age, Sex, AetiologyCat, Obesity, Hypertension, Diabetes, Dyslipidemia, Heartdisease, Pneumopathy, CKD, Bblockers, Rifaximin, Lactulose, PPIs, ChilPughclass, MELD, Varices, AlbgDL, Br, INR, Cr, Na, Platelets, ULN, TimeEventACLForTransplant, ACLForTransplant, Hospital)
+
+datos$Sex <- as_factor(datos$Sex)
+datos$AetiologyCat <- as_factor(datos$AetiologyCat)
+datos$Obesity <- as_factor(datos$Obesity)
+datos$Hypertension <- as_factor(datos$Hypertension)
+datos$Pneumopathy <- as_factor(datos$Pneumopathy)
+datos$Diabetes <- as_factor(datos$Diabetes)
+datos$Dyslipidemia <- as_factor(datos$Dyslipidemia)
+datos$Hospital <- as_factor(datos$Hospital)
+datos$CKD <- as_factor(datos$CKD)
+datos$Bblockers <- as_factor(datos$Bblockers)
+datos$Rifaximin <- as_factor(datos$Rifaximin)
+datos$Lactulose <- as_factor(datos$Lactulose)
+datos$PPIs <- as_factor(datos$PPIs)
+datos$ChilPughclass <- as_factor(datos$ChilPughclass)
+datos$Varices <- as_factor(datos$Varices)
+datos$ACLForTransplant <- as_factor(datos$ACLForTransplant)
+
+datos.multi <- datos %>% select(ULN, TimeEventACLForTransplant, ACLForTransplant, Hospital, Age, MELD, AlbgDL, Br, INR, Cr, AetiologyCat, ChilPughclass, Sex, Diabetes, Bblockers)
+datos.multi <- datos.multi %>% drop_na()
+datos.multi <- datos.multi[-c(331,271),]
+
+a <- c(0,25.01,50.01,75.01,100.01,125.01,150.01,200.01,250.01,350.01,455.01,1000.01,2453.001)
+time <- datos.multi$TimeEventACLForTransplant
+int.obs <- matrix(data = NA, nrow = nrow(datos.multi), ncol = length(a) - 1)
+d <- matrix(data = NA, nrow = nrow(datos.multi), ncol = length(a) - 1)
+
+for(i in 1:nrow(datos.multi)) {
+  for (k in 1:(length(a) - 1)) {
+    d[i, k] <- ifelse(time[i] - a[k] > 0, 1, 0) * ifelse(a[k + 1] - time[i] > 0, 1, 0)
+    int.obs[i, k] <- d[i, k] * k
+  }
+}
+
+int.obs <- rowSums(int.obs)
+
+X <- cbind(datos.multi$ULN)
+
+XF <- model.matrix(~ ULN + AlbgDL + Diabetes + AetiologyCat + INR + Bblockers + Sex + Cr + Br + Age, data = datos.multi) # Prepare data matrix for the multivariable models
+XF <- XF[, -c(1, 10)] # Remove intercept and impropriate categories
+
+delta <- matrix(c(as.integer(datos.multi$ACLForTransplant == "ACLF"),  as.integer(datos.multi$ACLForTransplant == "Transplant")), ncol = 2)
+```
+
+## ULN Univariable 
+
+### Weibull
+
+```{r}
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta))
+
+i.jags <- function() {
+  list(beta =rnorm(2), lambda = runif(ncol(delta)), alpha = runif(ncol(delta)))
+}
+
+p.jags <- c("beta", "alpha", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Uni_Weibull.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+ULN.W.100K <- coda.samples(m1, variable.names = p.jags, n.iter = 100000, n.thin = 10)
+save(ULN.W.100K, file="./Models RData/ULN_W_100K.Rdata")
+```
+
+### MPCF
+
+```{r}
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  time = time, X = X, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta))
+
+x1 <- runif(m, 0, 1)
+x2 <- runif(m, 0, 1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(beta = rnorm(2), lambda = lambda.init)}
+
+p.jags <- c("beta", "lambda")
+
+m2 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Uni_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m2, 2000)
+
+ULN.MPCF.100K <- coda.samples(m2, variable.names = p.jags, n.iter = 100000, thin = 10)
+save(ULN.MPCF.100K, file="./Models/Models RData/ULN_MPCF_100K.Rdata")
+```
+
+### Weibull Frailty
+
+```{r}
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = X, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta))
+
+i.jags <- function() {
+  list(beta =rnorm(2), lambda = runif(ncol(delta)), alpha = runif(ncol(delta)))
+}
+
+p.jags <- c("beta", "alpha", "lambda", "w")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Uni_Frailty_Weibull.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+ULN.FR.100K <- coda.samples(m1, variable.names = p.jags, n.iter = 100000, n.thin = 10)
+save(ULN.FR.100K, file="./Models/Models RData/ULN_FR_100K.Rdata")
+```
+
+### MPCF Frailty
+
+```{r}
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  t = time, X = X, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta))
+
+x1 <- runif(12, 0, 0.1)
+x2 <- runif(12, 0, 0.1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+
+i.jags <- function() {list(beta = rnorm(2), lambda = lambda.init)}
+
+p.jags <- c("beta", "lambda", "w")
+
+m2 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Uni_Frailty_MPCF.txt", inits = i.jags, n.chains = 3)
+
+update(m2, 2000)
+
+ULN.MPCF.FR.100K <- coda.samples(m2, variable.names = p.jags, n.iter = 100000, thin = 10)
+save(ULN.MPCF.FR.100K, file="./Models Rdata/ULN_MPCF_FR_100K.Rdata")
+```
+
+## Multivariable
+
+### Weibull
+
+```{r}
+d.jags <- list(n = nrow(datos.multi), t = as.vector(datos.multi$TimeEventACLForTransplant),
+  X = XF, delta = delta, zeros = rep(0, nrow(datos.multi)), Nrisks = ncol(delta), Nbetas = ncol(XF))
+
+beta.i <- matrix(rnorm(ncol(XF) * ncol(delta)), ncol=2)
+ind.i <- matrix(runif(ncol(XF) * ncol(delta), 0, 1), ncol=2)
+
+i.jags <- function() {
+  list(lambda = runif(ncol(delta)), alpha = runif(ncol(delta)), beta=beta.i)
+}
+
+p.jags <- c("beta", "alpha", "lambda")
+
+m1 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Weibull.txt", inits = i.jags, n.chains = 3)
+
+update(m1, 2000)
+
+MULTI.W.MF.100K <- coda.samples(m1, variable.names = p.jags, n.iter = 100000, n.thin = 10)
+save(MULTI.W.MF.100K, file="./Models RData/MULTI_W_MF_100K.Rdata")
+```
+
+### MPCF
+
+```{r}
+d.jags <- list(n = nrow(datos.multi), m = length(a) - 1, delta = delta,
+  time = time, X = XF, a = a, int.obs = int.obs, zeros = rep(0, nrow(datos.multi)), 
+  Nrisks = ncol(delta), Nbetas = ncol(XF))
+
+x1 <- runif(m, 0, 1)
+x2 <- runif(m, 0, 1)
+lambda.init <- data.frame(x1, x2)
+lambda.init <- as.matrix(lambda.init)
+beta.i <- matrix(rnorm(ncol(XF) * ncol(delta)), ncol=2)
+
+i.jags <- function() {list(lambda = lambda.init, beta=beta.i)}
+
+p.jags <- c("beta", "lambda")
+
+m2 <- jags.model(data = d.jags, file = "./JAGS Models/CR_Multi_Piecewise.txt", inits = i.jags, n.chains = 3)
+
+update(m2, 2000)
+
+MULTI.MPCF.MF.100K <- coda.samples(m2, variable.names = p.jags, n.iter = 100000, n.thin = 10)
+save(MULTI.MPCF.MF.100K, file="./Models/Competing Risks Piecewise/MULTI_MPCF_MF_100K.Rdata")
+```
+
+
+|       
+|       
+|       
+|       
+|       
+|       
+|       
+|       
+|       
+
+
+<div/>
+
+<div class="tocify-extend-page" data-unique="tocify-extend-page" style="height: 0;"></div>

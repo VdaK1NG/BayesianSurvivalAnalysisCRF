@@ -1,0 +1,787 @@
+---
+title: "Tables"
+author: "Pablo Escobar Hernández"
+output: 
+  html_document:
+    fig_caption: true
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1800px !important;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+</style>
+
+<div style="text-align: justify">
+
+## Load libraries
+
+```{r echo=FALSE}
+options(mc.cores = parallel::detectCores())
+library("haven") # leer datos
+library("dplyr") # manipular datos
+library("parallel")
+library("pracma")
+library("rjags") #rjags
+library("ggplot2") # gráficas
+library("tidyr")
+library("KMsurv")
+library("kableExtra")
+library("gridExtra")
+library("ggcorrplot")
+
+summary_parameters <- function(table) {
+  table <- cbind(apply(table, 1, mean), apply(table, 1, sd),
+    t(apply(table, 1, quantile, probs = c(0.025, 0.5, 0.975))))
+    colnames(table) <- c("Mean", "Sd", "2.5%", "Median", "97.5%")
+  return(table)
+}
+
+count_pct <- function(df) {
+  return(df %>% tally %>% mutate(n_pct = (n/sum(n))*100))
+}
+```
+
+## Prepare Data
+
+```{r eval=TRUE, echo=FALSE}
+data <- read_sav("data.sav")
+datos <- data %>% select(Age, Sex, AetiologyCat, Obesity, Hypertension, Diabetes, Dyslipidemia, Heartdisease, Pneumopathy, 
+                         CKD, Bblockers, Rifaximin, Lactulose, PPIs, ChilPughclass, MELD, Varices, AlbgDL, Br, INR, Cr, Na,
+                         Platelets, ULN, TimeEventACLForTransplant, ACLForTransplant, Hospital)
+
+datos$Sex <- as_factor(datos$Sex)
+datos$AetiologyCat <- as_factor(datos$AetiologyCat)
+datos$Obesity <- as_factor(datos$Obesity)
+datos$Hypertension <- as_factor(datos$Hypertension)
+datos$Pneumopathy <- as_factor(datos$Pneumopathy)
+datos$Diabetes <- as_factor(datos$Diabetes)
+datos$Dyslipidemia <- as_factor(datos$Dyslipidemia)
+datos$Hospital <- as_factor(datos$Hospital)
+datos$CKD <- as_factor(datos$CKD)
+datos$Bblockers <- as_factor(datos$Bblockers)
+datos$Rifaximin <- as_factor(datos$Rifaximin)
+datos$Lactulose <- as_factor(datos$Lactulose)
+datos$PPIs <- as_factor(datos$PPIs)
+datos$ChilPughclass <- as_factor(datos$ChilPughclass)
+datos$Varices <- as_factor(datos$Varices)
+datos$ACLForTransplant <- as_factor(datos$ACLForTransplant)
+
+datos.multi <- datos %>% select(Age, Sex, AetiologyCat, Diabetes, Bblockers, ChilPughclass, MELD, AlbgDL, Br, INR, Cr, ULN, TimeEventACLForTransplant, ACLForTransplant, Hospital)
+datos.multi <- datos.multi %>% drop_na()
+datos.multi <- datos.multi[-c(331,271),]
+time <- datos.multi$TimeEventACLForTransplant
+RFH <- datos.multi %>% filter(Hospital=="RFH")
+KCH <- datos.multi %>% filter(Hospital=="KCH")
+HCUV <- datos.multi %>% filter(Hospital=="HCUV")
+
+t <- seq(0,round(2453,dig=3),by=5) # Time data for predictions
+
+a <- c(0,25.01,50.01,75.01,100.01,125.01,150.01,200.01,250.01,350.01,455.01,1000.01,2453.001) # Define intervals manually
+time <- datos.multi$TimeEventACLForTransplant
+int.obs <- matrix(data = NA, nrow = nrow(datos.multi), ncol = length(a) - 1)
+d <- matrix(data = NA, nrow = nrow(datos.multi), ncol = length(a) - 1)
+
+for(i in 1:nrow(datos.multi)) {
+  for (k in 1:(length(a) - 1)) {
+    d[i, k] <- ifelse(time[i] - a[k] > 0, 1, 0) * ifelse(a[k + 1] - time[i] > 0, 1, 0)
+    int.obs[i, k] <- d[i, k] * k
+  }
+}
+
+int.obs <- rowSums(int.obs)
+
+cols <- c("ACLF" = "#4169E1", "Transplant" = "#DB7093")
+```
+
+## Descriptive Analysis
+
+### Table 3.1
+
+#### Diferrence between groups
+
+##### Age
+
+```{r}
+# EXTRACT VARIABLE PER HOSPITAL
+H1 <- datos.multi %>% filter(Hospital=="RFH") %>% select(Age)
+H2 <- datos.multi %>% filter(Hospital=="HCUV") %>% select(Age)
+H3 <- datos.multi %>% filter(Hospital=="KCH") %>% select(Age)
+
+# CHECK NORMALITY
+shapiro.test(datos.multi$Age)
+shapiro.test(H1$Age)
+shapiro.test(H2$Age)
+shapiro.test(H3$Age)
+
+# TEST FOR DIFFERENCES
+Age <- kruskal.test(datos.multi %>% group_by(Hospital) %>% select(Hospital, Age))
+```
+
+##### MELD
+
+```{r}
+# EXTRACT VARIABLE PER HOSPITAL
+H1 <- datos.multi %>% filter(Hospital=="RFH") %>% select(MELD)
+H2 <- datos.multi %>% filter(Hospital=="HCUV") %>% select(MELD)
+H3 <- datos.multi %>% filter(Hospital=="KCH") %>% select(MELD)
+
+# CHECK NORMALITY
+shapiro.test(datos.multi$MELD)
+shapiro.test(H1$MELD)
+shapiro.test(H2$MELD)
+shapiro.test(H3$MELD)
+
+# TEST FOR DIFFERENCES
+MELD <- summary(aov(MELD ~ Hospital, data=datos.multi))
+```
+
+##### AlbgDL
+
+```{r}
+# EXTRACT VARIABLE PER HOSPITAL
+H1 <- datos.multi %>% filter(Hospital=="RFH") %>% select(AlbgDL)
+H2 <- datos.multi %>% filter(Hospital=="HCUV") %>% select(AlbgDL)
+H3 <- datos.multi %>% filter(Hospital=="KCH") %>% select(AlbgDL)
+
+# CHECK NORMALITY
+shapiro.test(datos.multi$AlbgDL)
+shapiro.test(H1$AlbgDL)
+shapiro.test(H2$AlbgDL)
+shapiro.test(H3$AlbgDL)
+
+# TEST FOR DIFFERENCES
+AlbgDL <- kruskal.test(datos.multi %>% group_by(Hospital) %>% select(AlbgDL))
+```
+
+##### Br
+
+```{r}
+# EXTRACT VARIABLE PER HOSPITAL
+H1 <- datos.multi %>% filter(Hospital=="RFH") %>% select(Br)
+H2 <- datos.multi %>% filter(Hospital=="HCUV") %>% select(Br)
+H3 <- datos.multi %>% filter(Hospital=="KCH") %>% select(Br)
+
+# CHECK NORMALITY
+shapiro.test(datos.multi$Br)
+shapiro.test(H1$Br)
+shapiro.test(H2$Br)
+shapiro.test(H3$Br)
+
+# TEST FOR DIFFERENCES
+Br <- summary(aov(Br ~ Hospital, data=datos.multi))
+```
+
+##### INR
+
+```{r}
+# EXTRACT VARIABLE PER HOSPITAL
+H1 <- datos.multi %>% filter(Hospital=="RFH") %>% select(INR)
+H2 <- datos.multi %>% filter(Hospital=="HCUV") %>% select(INR)
+H3 <- datos.multi %>% filter(Hospital=="KCH") %>% select(INR)
+
+# CHECK NORMALITY
+shapiro.test(datos.multi$INR)
+shapiro.test(H1$INR)
+shapiro.test(H2$INR)
+shapiro.test(H3$INR)
+
+# TEST FOR DIFFERENCES
+INR <- summary(aov(INR ~ Hospital, data=datos.multi))
+```
+
+##### Cr
+
+```{r}
+# EXTRACT VARIABLE PER HOSPITAL
+H1 <- datos.multi %>% filter(Hospital=="RFH") %>% select(Cr)
+H2 <- datos.multi %>% filter(Hospital=="HCUV") %>% select(Cr)
+H3 <- datos.multi %>% filter(Hospital=="KCH") %>% select(Cr)
+
+# CHECK NORMALITY
+shapiro.test(datos.multi$Cr)
+shapiro.test(H1$Cr)
+shapiro.test(H2$Cr)
+shapiro.test(H3$Cr)
+
+# TEST FOR DIFFERENCES
+Cr <- summary(aov(Cr ~ Hospital, data=datos.multi))
+```
+
+##### ULN
+
+```{r}
+# EXTRACT VARIABLE PER HOSPITAL
+H1 <- datos.multi %>% filter(Hospital=="RFH") %>% select(ULN)
+H2 <- datos.multi %>% filter(Hospital=="HCUV") %>% select(ULN)
+H3 <- datos.multi %>% filter(Hospital=="KCH") %>% select(ULN)
+
+# CHECK NORMALITY
+shapiro.test(datos.multi$ULN)
+shapiro.test(H1$ULN)
+shapiro.test(H2$ULN)
+shapiro.test(H3$ULN)
+
+# TEST FOR DIFFERENCES
+ULN <- kruskal.test(datos.multi %>% group_by(Hospital) %>% select(ULN))
+```
+
+##### TimeEventACLForTransplant
+
+```{r}
+# EXTRACT VARIABLE PER HOSPITAL
+H1 <- datos.multi %>% filter(Hospital=="RFH") %>% select(TimeEventACLForTransplant)
+H2 <- datos.multi %>% filter(Hospital=="HCUV") %>% select(TimeEventACLForTransplant)
+H3 <- datos.multi %>% filter(Hospital=="KCH") %>% select(TimeEventACLForTransplant)
+
+# CHECK NORMALITY
+shapiro.test(datos.multi$TimeEventACLForTransplant)
+shapiro.test(H1$TimeEventACLForTransplant)
+shapiro.test(H2$TimeEventACLForTransplant)
+shapiro.test(H3$TimeEventACLForTransplant)
+
+# TEST FOR DIFFERENCES
+TimeEvent <- summary(aov(TimeEventACLForTransplant ~ Hospital, data=datos.multi))
+```
+
+```{r}
+# EXTRACT P VALUES
+contr <- round(c(Age$p.value, MELD[[1]]$`Pr(>F)`[1], AlbgDL$p.value, Br[[1]]$`Pr(>F)`[1], INR[[1]]$`Pr(>F)`[1], Cr[[1]]$`Pr(>F)`[1], ULN$p.value, TimeEvent[[1]]$`Pr(>F)`[1]), 3)
+```
+
+#### Mean/Median and SD
+
+```{r}
+# GENERAL
+mrt <- c(mean(datos.multi$Age), mean(datos.multi$MELD),mean(datos.multi$AlbgDL),mean(datos.multi$Br),mean(datos.multi$INR),mean(datos.multi$Cr),mean(datos.multi$ULN), mean(datos.multi$TimeEventACLForTransplant))
+sdrt <- c(sd(datos.multi$Age), sd(datos.multi$MELD), sd(datos.multi$AlbgDL), sd(datos.multi$Br), sd(datos.multi$INR), sd(datos.multi$Cr), sd(datos.multi$ULN), sd(datos.multi$TimeEventACLForTransplant))
+
+# RFH
+mrRFH <- c(median(RFH$Age), mean(RFH$MELD),mean(RFH$AlbgDL),mean(RFH$Br),mean(RFH$INR),mean(RFH$Cr),median(RFH$ULN), mean(RFH$TimeEventACLForTransplant))
+sdrRFH <- c(sd(RFH$Age), sd(RFH$MELD), sd(RFH$AlbgDL), sd(RFH$Br), sd(RFH$INR), sd(RFH$Cr), sd(RFH$ULN), sd(RFH$TimeEventACLForTransplant))
+
+# HCUV
+mrHCUV <- c(median(HCUV$Age), mean(HCUV$MELD),mean(HCUV$AlbgDL),mean(HCUV$Br),mean(HCUV$INR),mean(HCUV$Cr),mean(HCUV$ULN), mean(HCUV$TimeEventACLForTransplant))
+sdrHCUV <- c(sd(HCUV$Age), sd(HCUV$MELD), sd(HCUV$AlbgDL), sd(HCUV$Br), sd(HCUV$INR), sd(HCUV$Cr), sd(HCUV$ULN), sd(HCUV$TimeEventACLForTransplant))
+
+# KCH
+mrKCH <- c(mean(KCH$Age), mean(KCH$MELD), median(KCH$AlbgDL),mean(KCH$Br),mean(KCH$INR),mean(KCH$Cr),mean(KCH$ULN), mean(KCH$TimeEventACLForTransplant))
+sdRKCH <- c(sd(KCH$Age), sd(KCH$MELD), sd(KCH$AlbgDL), sd(KCH$Br), sd(KCH$INR), sd(KCH$Cr), sd(KCH$ULN), sd(KCH$TimeEventACLForTransplant))
+```
+
+#### Final Table
+
+```{r}
+test <- c("Kr.-Wa", "ANOVA","Kr.-Wa","ANOVA","ANOVA","ANOVA","Kr.-Wa","ANOVA")
+vars <- c("Age", "MELD", "AlbgDL", "Br", "INR", "Cr", "ULN", "TEAOT")
+table <- data.frame(mrt, sdrt, mrRFH, sdrRFH, mrHCUV, sdrHCUV, mrKCH, sdRKCH)
+table <- round(table,2)
+table <- data.frame(vars, table, contr, test)
+colnames(table) <- c("Variable", "Mean T", "SD T", "Mean RFH", "SD RFH", "Mean HCUV", "SD HCUV", "Mean KCH", "SD KCH", "p value", "Test" )
+kable(table, align = c("c", "c", "c", "c", "c", "c", "c", "c"), caption="Table 3.1")
+```
+
+### Table 3.2
+
+#### Prepare Data
+
+```{r}
+ATCAT <- datos.multi %>% group_by(AetiologyCat) %>% count_pct()
+ATCATH <- datos.multi %>% group_by(Hospital, AetiologyCat) %>% count_pct()
+ATCA.test <- chisq.test(datos.multi$Hospital, datos.multi$AetiologyCat)
+
+CPT <- datos.multi %>% group_by(ChilPughclass) %>% count_pct()
+CPH <- datos.multi %>% group_by(Hospital, ChilPughclass) %>% count_pct()
+CP.test <- chisq.test(datos.multi$Hospital, datos.multi$ChilPughclass)
+
+SEXT <- datos.multi %>% group_by(Sex) %>% count_pct()
+SEXH <- datos.multi %>% group_by(Hospital, Sex) %>% count_pct()
+SEX.test <- chisq.test(datos.multi$Hospital, datos.multi$Sex)
+
+DIAT <- datos.multi %>% group_by(Diabetes) %>% count_pct()
+DIAH <- datos.multi %>% group_by(Hospital, Diabetes) %>% count_pct()
+DIA.test <- chisq.test(datos.multi$Hospital, datos.multi$Diabetes)
+
+AOTT <- datos.multi %>% group_by(ACLForTransplant) %>% count_pct()
+AOTH <- datos.multi %>% group_by(Hospital, ACLForTransplant) %>% count_pct()
+AOT.test <- chisq.test(datos.multi$Hospital, datos.multi$ACLForTransplant)
+
+BBT <- datos.multi %>% group_by(Bblockers) %>% count_pct()
+BBH <- datos.multi %>% group_by(Hospital, Bblockers) %>% count_pct()
+BB.test <- chisq.test(datos.multi$Hospital, datos.multi$Bblockers)
+```
+
+#### Table
+
+```{r}
+c1 <- c(ATCAT$n, CPT$n, AOTT$n, SEXT$n[1], DIAT$n[2], BBT$n[2])
+c2 <- round(c(ATCAT$n_pct, CPT$n_pct, AOTT$n_pct, SEXT$n_pct[1], DIAT$n_pct[2], BBT$n_pct[2]), 2)
+
+c3 <- c(ATCATH$n[1:5], CPH$n[1:3], AOTH$n[1:3], SEXH$n[1], DIAH$n[2], BBH$n[2])
+c4 <- round(c(ATCATH$n_pct[1:5], CPH$n_pct[1:3], AOTH$n_pct[1:3], SEXH$n_pct[1], DIAH$n_pct[2], BBH$n_pct[2]), 2)
+
+c5 <- c(ATCATH$n[6:10], CPH$n[4:6], AOTH$n[4:6], SEXH$n[3], DIAH$n[4], BBH$n[4])
+c6 <- round(c(ATCATH$n_pct[6:10], CPH$n_pct[4:6], AOTH$n_pct[4:6], SEXH$n_pct[3], DIAH$n_pct[4], BBH$n_pct[4]), 2)
+
+c7 <- c(ATCATH$n[11:15], CPH$n[7:9], AOTH$n[7:9], SEXH$n[5], DIAH$n[6], BBH$n[6])
+c8 <- round(c(ATCATH$n_pct[11:15], CPH$n_pct[7:9], AOTH$n_pct[7:9], SEXH$n_pct[5], DIAH$n_pct[6], BBH$n_pct[6]), 2)
+
+c9 <- round(c(0, 0, ATCA.test$p.value, 0, 0, 0, CP.test$p.value, 0, 0, AOT.test$p.value, 0, SEX.test$p.value, DIA.test$p.value, BB.test$p.value), 3)
+  
+c10 <- rep("Chi-Square", 14)
+c0 <- c("ALD", "Viral", "Autoinmune", "NAFLD", "Other", "A", "B", "C", "No", "ACLF", "Transplant", "Sex (M)", "Diabetes (Yes)", "Bblockers (Yes)")
+
+table <- data.frame(c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10)
+
+colnames(table) <- c("Variable", "n T", "% T", "n RFH", "% RFH", "n HCUV", "% HCUV", "n KCH", "% KCH", "p value", "Test" )
+kable(table, align = c("c", "c", "c", "c", "c", "c", "c", "c"), caption="Table 3.2")
+```
+
+## Univariable Models
+
+### Load Rdatas
+
+```{r}
+load("./Models RData/ULN_W_100K.Rdata")  
+load("./Models RData/ULN_MPCF_100K.Rdata") 
+load("./Models RData/ULN_FR_100K.Rdata") 
+load("./Models RData/ULN_MPCF_FR_100K.Rdata") 
+```
+
+### Tables 4.1 and 4.2
+
+```{r}
+result <- as.mcmc(do.call(rbind, ULN.W.100K))
+
+alpha1 <- result[, 1]
+alpha2 <- result[, 2]
+
+beta1 <- result[, 3]
+beta2 <- result[, 4]
+
+lambda1 <- result[, 5]
+lambda2 <- result[, 6]
+
+p0 <- c(mean(alpha1 > 0), mean(beta1 > 0), mean(lambda1 > 0), mean(alpha2 > 0),mean(beta2 > 0), mean(lambda2 > 0))
+
+table <- rbind(alpha1, beta1, lambda1, alpha2, beta2, lambda2)
+table <- round(cbind(summary_parameters(table), p0), dig = 3)
+
+colnames(table) <- c("Mean", "Sd", "2.5%", "Median", "97.5%", "P.>0")
+rownames(table) <- c("alpha1", "beta1", "lambda1", "alpha2", "beta2", "lambda2")
+
+Var1.UP <- round(exp(table[2,5])/exp(0), 3)
+Var1.LW <- round(exp(table[2,3])/exp(0), 3)
+Var1.M <- round(exp(table[2,1])/exp(0), 3)
+
+Var2.UP <- round(exp(table[5,5])/exp(0), 3)
+Var2.LW <- round(exp(table[5,3])/exp(0), 3)
+Var2.M <- round(exp(table[5,1])/exp(0), 3)
+
+Var.RR <- data.frame("Parámetro" = c("ACLF", "Transplant"), "Lower Limit" = c(Var1.LW, Var2.LW), "Mean" = c(Var1.M, Var2.M), "Upper Limit" = c(Var1.UP, Var2.UP))
+
+
+kable(table, align = c("c", "c", "c", "c", "c","c", "c", "c", "c"), caption="Table 4.1")
+kable(Var.RR, align = c("c", "c", "c", "c"), caption="Table 4.2")
+```
+
+### Tables 4.3 
+
+```{r}
+datos.multi$p12 <- int.obs
+data.tab <- datos.multi %>% group_by(ACLForTransplant, p12) %>% summarise(n = n())
+r1 <- data.tab[12:23,3]$n
+r2 <- data.tab[24:35,3]$n
+r3 <- c(0, data.tab[1:11,3]$n)
+data.tab <- rbind(r1, r2, r3)
+data.tab <- data.frame(c("ACLF", "Transplant", "No"), data.tab)
+colnames(data.tab) <- c("Upper Limit", "25", "50", "75", "100", "125", "150", "200", "250", "350", "455", "1000", "2453")
+kable(data.tab, align = c("c", "c", "c", "c", "c","c", "c", "c", "c", "c", "c", "c", "c"), caption="Table 4.3")
+```
+
+### Tables 4.4 and 4.5
+
+```{r}
+result <- as.mcmc(do.call(rbind, ULN.MPCF.100K))
+names <- summary(ULN.MPCF.100K)
+names <- rownames(names$statistics)
+
+beta1 <- result[, 1]
+beta2 <- result[, 2]
+
+lambda1.1 <- result[, 3]
+lambda2.1 <- result[, 4]
+lambda3.1 <- result[, 5]
+lambda4.1 <- result[, 6]
+lambda5.1 <- result[, 7]
+lambda6.1 <- result[, 8]
+lambda7.1 <- result[, 9]
+lambda8.1 <- result[, 10]
+lambda9.1 <- result[, 11]
+lambda10.1 <- result[, 12]
+lambda11.1 <- result[, 13]
+lambda12.1 <- result[, 14]
+
+lambda1.2 <- result[, 15]
+lambda2.2 <- result[, 16]
+lambda3.2 <- result[, 17]
+lambda4.2 <- result[, 18]
+lambda5.2 <- result[, 19]
+lambda6.2 <- result[, 20]
+lambda7.2 <- result[, 21]
+lambda8.2 <- result[, 22]
+lambda9.2 <- result[, 23]
+lambda10.2 <- result[, 24]
+lambda11.2 <- result[, 25]
+lambda12.2 <- result[, 26]
+
+p0 <- c(mean(beta1 > 0), mean(lambda1.1 > 0), mean(lambda2.1 > 0), mean(lambda3.1 > 0),mean(lambda4.1 > 0), mean(lambda5.1 > 0), mean(lambda6.1 > 0), mean(lambda7.1 > 0), mean(lambda8.1 > 0), mean(lambda9.1 > 0), mean(lambda10.1 > 0), mean(lambda11.1 > 0), mean(lambda12.1 > 0), 
+        mean(beta2 > 0), mean(lambda1.2 > 0), mean(lambda2.2 > 0), mean(lambda3.2 > 0),mean(lambda4.2 > 0), mean(lambda5.2 > 0), mean(lambda6.2 > 0), mean(lambda7.2 > 0), mean(lambda8.2 > 0), mean(lambda9.2 > 0), mean(lambda10.2 > 0), mean(lambda11.2 > 0), mean(lambda12.2 > 0))
+
+table <- rbind(beta1, lambda1.1, lambda2.1,lambda3.1,lambda4.1,lambda5.1,lambda6.1,lambda7.1,lambda8.1,lambda9.1,lambda10.1,lambda11.1,lambda12.1,
+               beta2, lambda1.2, lambda2.2,lambda3.2,lambda4.2,lambda5.2,lambda6.2,lambda7.2,lambda8.2,lambda9.2,lambda10.2,lambda11.2,lambda12.2)
+table <- round(cbind(summary_parameters(table), p0), dig = 3)
+
+colnames(table) <- c("Mean", "Sd", "2.5%", "Median", "97.5%", "P.>0")
+rownames(table) <- c(names[c(1,3:14)], names[c(2, 15:26)])
+
+Var1.UP <- round(exp(table[1,5])/exp(0), 3)
+Var1.LW <- round(exp(table[1,3])/exp(0), 3)
+Var1.M <- round(exp(table[1,1])/exp(0), 3)
+
+Var2.UP <- round(exp(table[14,5])/exp(0), 3)
+Var2.LW <- round(exp(table[14,3])/exp(0), 3)
+Var2.M <- round(exp(table[14,1])/exp(0), 3)
+
+Var.RR <- data.frame("Parámetro" = c("ACLF", "Transplant"), "Lower Limit" = c(Var1.LW, Var2.LW), "Mean" = c(Var1.M, Var2.M), "Upper Limit" = c(Var1.UP, Var2.UP))
+
+
+kable(table, align = c("c", "c", "c", "c", "c","c", "c", "c", "c"), caption="Table 4.4")
+kable(Var.RR, align = c("c", "c", "c", "c"), caption="Table 4.5")
+```
+
+### Tables 4.6 and 4.7
+
+```{r}
+result <- as.mcmc(do.call(rbind, ULN.FR.100K))
+
+alpha1 <- result[, 1]
+alpha2 <- result[, 2]
+
+beta1 <- result[, 3]
+beta2 <- result[, 4]
+
+lambda1 <- result[, 5]
+lambda2 <- result[, 6]
+
+p0 <- c(mean(alpha1 > 0), mean(beta1 > 0), mean(lambda1 > 0), mean(alpha2 > 0),mean(beta2 > 0), mean(lambda2 > 0))
+
+table <- rbind(alpha1, beta1, lambda1, alpha2, beta2, lambda2)
+table <- round(cbind(summary_parameters(table), p0), dig = 3)
+
+colnames(table) <- c("Mean", "Sd", "2.5%", "Median", "97.5%", "P.>0")
+rownames(table) <- c("alpha1", "beta1", "lambda1", "alpha2", "beta2", "lambda2")
+
+Var1.UP <- round(exp(table[2,5])/exp(0), 3)
+Var1.LW <- round(exp(table[2,3])/exp(0), 3)
+Var1.M <- round(exp(table[2,1])/exp(0), 3)
+
+Var2.UP <- round(exp(table[5,5])/exp(0), 3)
+Var2.LW <- round(exp(table[5,3])/exp(0), 3)
+Var2.M <- round(exp(table[5,1])/exp(0), 3)
+
+Var.RR <- data.frame("Parámetro" = c("ACLF", "Transplant"), "Lower Limit" = c(Var1.LW, Var2.LW), "Mean" = c(Var1.M, Var2.M), "Upper Limit" = c(Var1.UP, Var2.UP))
+
+
+kable(table, align = c("c", "c", "c", "c", "c","c", "c", "c", "c"), caption="Parameter values")
+kable(Var.RR, align = c("c", "c", "c", "c"))
+```
+
+### Tables 4.8 and 4.9
+
+```{r}
+result <- as.mcmc(do.call(rbind, ULN.MPCF.FR.100K))
+
+beta1 <- result[, 1]
+beta2 <- result[, 2]
+
+lambda1.1 <- result[, 3]
+lambda2.1 <- result[, 4]
+lambda3.1 <- result[, 5]
+lambda4.1 <- result[, 6]
+lambda5.1 <- result[, 7]
+lambda6.1 <- result[, 8]
+lambda7.1 <- result[, 9]
+lambda8.1 <- result[, 10]
+lambda9.1 <- result[, 11]
+lambda10.1 <- result[, 12]
+lambda11.1 <- result[, 13]
+lambda12.1 <- result[, 14]
+
+lambda1.2 <- result[, 15]
+lambda2.2 <- result[, 16]
+lambda3.2 <- result[, 17]
+lambda4.2 <- result[, 18]
+lambda5.2 <- result[, 19]
+lambda6.2 <- result[, 20]
+lambda7.2 <- result[, 21]
+lambda8.2 <- result[, 22]
+lambda9.2 <- result[, 23]
+lambda10.2 <- result[, 24]
+lambda11.2 <- result[, 25]
+lambda12.2 <- result[, 26]
+
+p0 <- c(mean(beta1 > 0), mean(lambda1.1 > 0), mean(lambda2.1 > 0), mean(lambda3.1 > 0),mean(lambda4.1 > 0), mean(lambda5.1 > 0), mean(lambda6.1 > 0), mean(lambda7.1 > 0), mean(lambda8.1 > 0), mean(lambda9.1 > 0), mean(lambda10.1 > 0), mean(lambda11.1 > 0), mean(lambda12.1 > 0), 
+        mean(beta2 > 0), mean(lambda1.2 > 0), mean(lambda2.2 > 0), mean(lambda3.2 > 0),mean(lambda4.2 > 0), mean(lambda5.2 > 0), mean(lambda6.2 > 0), mean(lambda7.2 > 0), mean(lambda8.2 > 0), mean(lambda9.2 > 0), mean(lambda10.2 > 0), mean(lambda11.2 > 0), mean(lambda12.2 > 0))
+
+table <- rbind(beta1, lambda1.1, lambda2.1,lambda3.1,lambda4.1,lambda5.1,lambda6.1,lambda7.1,lambda8.1,lambda9.1,lambda10.1,lambda11.1,lambda12.1,
+               beta2, lambda1.2, lambda2.2,lambda3.2,lambda4.2,lambda5.2,lambda6.2,lambda7.2,lambda8.2,lambda9.2,lambda10.2,lambda11.2,lambda12.2)
+table <- round(cbind(summary_parameters(table), p0), dig = 3)
+
+colnames(table) <- c("Mean", "Sd", "2.5%", "Median", "97.5%", "P.>0")
+rownames(table) <- c(names[c(1,3:14)], names[c(2, 15:26)])
+
+Var1.UP <- round(exp(table[1,5])/exp(0), 3)
+Var1.LW <- round(exp(table[1,3])/exp(0), 3)
+Var1.M <- round(exp(table[1,1])/exp(0), 3)
+
+Var2.UP <- round(exp(table[14,5])/exp(0), 3)
+Var2.LW <- round(exp(table[14,3])/exp(0), 3)
+Var2.M <- round(exp(table[14,1])/exp(0), 3)
+
+Var.RR <- data.frame("Parámetro" = c("ACLF", "Transplant"), "Lower Limit" = c(Var1.LW, Var2.LW), "Mean" = c(Var1.M, Var2.M), "Upper Limit" = c(Var1.UP, Var2.UP))
+
+
+kable(table, align = c("c", "c", "c", "c", "c","c", "c", "c", "c"), caption="Table 4.8")
+kable(Var.RR, align = c("c", "c", "c", "c"), caption="Table 4.9")
+```
+
+## Multivariable Models
+
+### Load Rdatas
+
+```{r}
+load("./Models RData/MULTI_W_MF_100K.Rdata")
+load("./Models RData/MULTI_MPCF_MF_100K.Rdata")
+```
+
+## Tables 5.1 and 5.2
+
+```{r}
+result <- as.mcmc(do.call(rbind, MULTI.W.MF.100K))
+
+beta1 <- result[, 3]
+beta2 <- result[, 4]
+beta3 <- result[, 5]
+beta4 <- result[, 6]
+beta5 <- result[, 7]
+beta6 <- result[, 8]
+beta7 <- result[, 9]
+beta8 <- result[, 10]
+beta9 <- result[, 11]
+beta10 <- result[, 12]
+beta11 <- result[, 13]
+beta12 <- result[, 14]
+beta13 <- result[, 15]
+
+p0 <- c(mean(beta1 > 0), mean(beta2 > 0), mean(beta3 > 0), mean(beta4 > 0), mean(beta5 > 0), mean(beta6 > 0), mean(beta7 > 0), 
+        mean(beta8 > 0), mean(beta9 > 0), mean(beta10 > 0), mean(beta11 > 0), mean(beta12 > 0), mean(beta13 > 0))
+
+
+table <- rbind(beta1, beta2, beta3, beta4, beta5, beta6, beta7, beta8, beta9, beta10, beta11, beta12, beta13)
+table <- round(cbind(summary_parameters(table), p0), dig = 3)
+
+colnames(table) <- c("Mean", "Sd", "2.5%", "Median", "97.5%", "P>0")
+rownames(table) <- c("beta1", "beta2", "beta3", "beta4", "beta5", "beta6", "beta7", "beta8", "beta9", "beta10", "beta11", "beta12", "beta13")
+
+Var1.UP <- round(exp(table[1,5]*max(datos.multi$ULN))/exp(table[1,5]*min(datos.multi$ULN)), 3)
+Var1.LW <- round(exp(table[1,3]*max(datos.multi$ULN))/exp(table[1,3]*min(datos.multi$ULN)), 3)
+Var1.ME <- round(exp(table[1,1]*max(datos.multi$ULN))/exp(table[1,1]*min(datos.multi$ULN)), 3)
+
+Var2.UP <- round(exp(table[2,5]*max(datos.multi$AlbgDL))/exp(table[2,5]*min(datos.multi$AlbgDL)), 3)
+Var2.LW <- round(exp(table[2,3]*max(datos.multi$AlbgDL))/exp(table[2,3]*min(datos.multi$AlbgDL)), 3)
+Var2.ME <- round(exp(table[2,1]*max(datos.multi$AlbgDL))/exp(table[2,1]*min(datos.multi$AlbgDL)), 3)
+
+Var3.UP <- round(exp(table[3,5])/exp(0), 3)
+Var3.LW <- round(exp(table[3,3])/exp(0), 3)
+Var3.ME <- round(exp(table[3,1])/exp(0), 3)
+
+Var4.UP <- round(exp(table[4,5])/exp(0), 3)
+Var4.LW <- round(exp(table[4,3])/exp(0), 3)
+Var4.ME <- round(exp(table[4,1])/exp(0), 3)
+
+Var5.UP <- round(exp(table[5,5])/exp(0), 3)
+Var5.LW <- round(exp(table[5,3])/exp(0), 3)
+Var5.ME <- round(exp(table[5,1])/exp(0), 3)
+
+Var6.UP <- round(exp(table[6,5])/exp(0), 3)
+Var6.LW <- round(exp(table[6,3])/exp(0), 3)
+Var6.ME <- round(exp(table[6,1])/exp(0), 3)
+
+Var7.UP <- round(exp(table[7,5])/exp(0), 3)
+Var7.LW <- round(exp(table[7,3])/exp(0), 3)
+Var7.ME <- round(exp(table[7,1])/exp(0), 3)
+
+Var8.UP <- round(exp(table[8,5]*max(datos.multi$INR))/exp(table[8,5]*min(datos.multi$INR)), 3)
+Var8.LW <- round(exp(table[8,3]*max(datos.multi$INR))/exp(table[8,3]*min(datos.multi$INR)), 3)
+Var8.ME <- round(exp(table[8,1]*max(datos.multi$INR))/exp(table[8,1]*min(datos.multi$INR)), 3)
+
+Var9.UP <- round(exp(table[9,5])/exp(0), 3)
+Var9.LW <- round(exp(table[9,3])/exp(0), 3)
+Var9.ME <- round(exp(table[9,1])/exp(0), 3)
+
+Var10.UP <- round(exp(table[10,5])/exp(0), 3)
+Var10.LW <- round(exp(table[10,3])/exp(0), 3)
+Var10.ME <- round(exp(table[10,1])/exp(0), 3)
+
+Var11.UP <- round(exp(table[11,5]*max(datos.multi$Cr))/exp(table[11,5]*min(datos.multi$Cr)), 3)
+Var11.LW <- round(exp(table[11,3]*max(datos.multi$Cr))/exp(table[11,3]*min(datos.multi$Cr)), 3)
+Var11.ME <- round(exp(table[11,1]*max(datos.multi$Cr))/exp(table[11,1]*min(datos.multi$Cr)), 3)
+
+Var12.UP <- round(exp(table[12,5]*max(datos.multi$Br))/exp(table[12,5]*min(datos.multi$Br)), 3)
+Var12.LW <- round(exp(table[12,3]*max(datos.multi$Br))/exp(table[12,3]*min(datos.multi$Br)), 3)
+Var12.ME <- round(exp(table[12,1]*max(datos.multi$Br))/exp(table[12,1]*min(datos.multi$Br)), 3)
+
+Var13.UP <- round(exp(table[13,5]*max(datos.multi$Age))/exp(table[13,5]*min(datos.multi$Age)), 3)
+Var13.LW <- round(exp(table[13,3]*max(datos.multi$Age))/exp(table[13,3]*min(datos.multi$Age)), 3)
+Var13.ME <- round(exp(table[13,1]*max(datos.multi$Age))/exp(table[13,1]*min(datos.multi$Age)), 3)
+
+
+
+Var.RR.W <- data.frame("Covariate" = c("ULN", "AlbgDL", "Diabetes", "Aet.Cat.Viral", "Aet.Cat.Autoinmune", "Aet.Cat.NAFLD", "Aet.Cat.Other", "INR", "Bblockers", "Sex", "Cr", "Br", "Age"), "Lower Limit" = c(Var1.LW, Var2.LW, Var3.LW, Var4.LW, Var5.LW, Var6.LW, Var7.LW, Var8.LW, Var9.LW, Var10.LW, Var11.LW, Var12.LW, Var13.LW), 
+                     "Mean" = c(Var1.ME, Var2.ME, Var3.ME, Var4.ME, Var5.ME, Var6.ME, Var7.ME, Var8.ME, Var9.ME, Var10.ME, Var11.ME, Var12.ME, Var13.ME), 
+                     "Upper Limit" = c(Var1.UP, Var2.UP, Var3.UP, Var4.UP, Var5.UP, Var6.UP, Var7.UP, Var8.UP, Var9.UP, Var10.UP, Var11.UP, Var12.UP, Var13.UP))
+
+table.W <- table
+
+kable(table.W, align = c("c", "c", "c", "c", "c","c", "c", "c", "c"), caption="Table 5.1")
+kable(Var.RR.W, align = c("c", "c", "c", "c"), caption="Table 5.2")
+```
+
+## Tables 5.3 and 5.4
+
+```{r}
+result <- as.mcmc(do.call(rbind, MULTI.MPCF.MF.100K))
+
+beta1 <- result[, 1]
+beta2 <- result[, 2]
+beta3 <- result[, 3]
+beta4 <- result[, 4]
+beta5 <- result[, 5]
+beta6 <- result[, 6]
+beta7 <- result[, 7]
+beta8 <- result[, 8]
+beta9 <- result[, 9]
+beta10 <- result[, 10]
+beta11 <- result[, 11]
+beta12 <- result[, 12]
+beta13 <- result[, 13]
+
+p0 <- c(mean(beta1 > 0), mean(beta2 > 0), mean(beta3 > 0), mean(beta4 > 0), mean(beta5 > 0), mean(beta6 > 0), mean(beta7 > 0), 
+        mean(beta8 > 0), mean(beta9 > 0), mean(beta10 > 0), mean(beta11 > 0), mean(beta12 > 0), mean(beta13 > 0))
+
+
+table <- rbind(beta1, beta2, beta3, beta4, beta5, beta6, beta7, beta8, beta9, beta10, beta11, beta12, beta13)
+table <- round(cbind(summary_parameters(table), p0), dig = 3)
+
+colnames(table) <- c("Mean", "Sd", "2.5%", "Median", "97.5%", "P>0")
+rownames(table) <- c("ULN", "AlbgDL", "Diabetes", "Aet.Cat.Viral", "Aet.Cat.Autoinmune", "Aet.Cat.NAFLD", "Aet.Cat.Other", "INR", "Bblockers", "Sex", "Cr", "Br", "Age")
+
+Var1.UP <- round(exp(table[1,5]*max(datos.multi$ULN))/exp(table[1,5]*min(datos.multi$ULN)), 3)
+Var1.LW <- round(exp(table[1,3]*max(datos.multi$ULN))/exp(table[1,3]*min(datos.multi$ULN)), 3)
+Var1.ME <- round(exp(table[1,1]*max(datos.multi$ULN))/exp(table[1,1]*min(datos.multi$ULN)), 3)
+
+Var2.UP <- round(exp(table[2,5]*max(datos.multi$AlbgDL))/exp(table[2,5]*min(datos.multi$AlbgDL)), 3)
+Var2.LW <- round(exp(table[2,3]*max(datos.multi$AlbgDL))/exp(table[2,3]*min(datos.multi$AlbgDL)), 3)
+Var2.ME <- round(exp(table[2,1]*max(datos.multi$AlbgDL))/exp(table[2,1]*min(datos.multi$AlbgDL)), 3)
+
+Var3.UP <- round(exp(table[3,5])/exp(0), 3)
+Var3.LW <- round(exp(table[3,3])/exp(0), 3)
+Var3.ME <- round(exp(table[3,1])/exp(0), 3)
+
+Var4.UP <- round(exp(table[4,5])/exp(0), 3)
+Var4.LW <- round(exp(table[4,3])/exp(0), 3)
+Var4.ME <- round(exp(table[4,1])/exp(0), 3)
+
+Var5.UP <- round(exp(table[5,5])/exp(0), 3)
+Var5.LW <- round(exp(table[5,3])/exp(0), 3)
+Var5.ME <- round(exp(table[5,1])/exp(0), 3)
+
+Var6.UP <- round(exp(table[6,5])/exp(0), 3)
+Var6.LW <- round(exp(table[6,3])/exp(0), 3)
+Var6.ME <- round(exp(table[6,1])/exp(0), 3)
+
+Var7.UP <- round(exp(table[7,5])/exp(0), 3)
+Var7.LW <- round(exp(table[7,3])/exp(0), 3)
+Var7.ME <- round(exp(table[7,1])/exp(0), 3)
+
+Var8.UP <- round(exp(table[8,5]*max(datos.multi$INR))/exp(table[8,5]*min(datos.multi$INR)), 3)
+Var8.LW <- round(exp(table[8,3]*max(datos.multi$INR))/exp(table[8,3]*min(datos.multi$INR)), 3)
+Var8.ME <- round(exp(table[8,1]*max(datos.multi$INR))/exp(table[8,1]*min(datos.multi$INR)), 3)
+
+Var9.UP <- round(exp(table[9,5])/exp(0), 3)
+Var9.LW <- round(exp(table[9,3])/exp(0), 3)
+Var9.ME <- round(exp(table[9,1])/exp(0), 3)
+
+Var10.UP <- round(exp(table[10,5])/exp(0), 3)
+Var10.LW <- round(exp(table[10,3])/exp(0), 3)
+Var10.ME <- round(exp(table[10,1])/exp(0), 3)
+
+Var11.UP <- round(exp(table[11,5]*max(datos.multi$Cr))/exp(table[11,5]*min(datos.multi$Cr)), 3)
+Var11.LW <- round(exp(table[11,3]*max(datos.multi$Cr))/exp(table[11,3]*min(datos.multi$Cr)), 3)
+Var11.ME <- round(exp(table[11,1]*max(datos.multi$Cr))/exp(table[11,1]*min(datos.multi$Cr)), 3)
+
+Var12.UP <- round(exp(table[12,5]*max(datos.multi$Br))/exp(table[12,5]*min(datos.multi$Br)), 3)
+Var12.LW <- round(exp(table[12,3]*max(datos.multi$Br))/exp(table[12,3]*min(datos.multi$Br)), 3)
+Var12.ME <- round(exp(table[12,1]*max(datos.multi$Br))/exp(table[12,1]*min(datos.multi$Br)), 3)
+
+Var13.UP <- round(exp(table[13,5]*max(datos.multi$Age))/exp(table[13,5]*min(datos.multi$Age)), 3)
+Var13.LW <- round(exp(table[13,3]*max(datos.multi$Age))/exp(table[13,3]*min(datos.multi$Age)), 3)
+Var13.ME <- round(exp(table[13,1]*max(datos.multi$Age))/exp(table[13,1]*min(datos.multi$Age)), 3)
+
+
+Var.RR.PW <- data.frame("Covariate" = c("ULN", "AlbgDL", "Diabetes", "Aet.Cat.Viral", "Aet.Cat.Autoinmune", "Aet.Cat.NAFLD", "Aet.Cat.Other", "INR", "Bblockers", "Sex", "Cr", "Br", "Age"), "Lower Limit" = c(Var1.LW, Var2.LW, Var3.LW, Var4.LW, Var5.LW, Var6.LW, Var7.LW, Var8.LW, Var9.LW, Var10.LW, Var11.LW, Var12.LW, Var13.LW), 
+                     "Mean" = c(Var1.ME, Var2.ME, Var3.ME, Var4.ME, Var5.ME, Var6.ME, Var7.ME, Var8.ME, Var9.ME, Var10.ME, Var11.ME, Var12.ME, Var13.ME), 
+                     "Upper Limit" = c(Var1.UP, Var2.UP, Var3.UP, Var4.UP, Var5.UP, Var6.UP, Var7.UP, Var8.UP, Var9.UP, Var10.UP, Var11.UP, Var12.UP, Var13.UP))
+
+table.PW <- table
+
+kable(table.PW, align = c("c", "c", "c", "c", "c","c", "c", "c", "c"), caption="Table 5.3")
+kable(Var.RR.PW, align = c("c", "c", "c", "c"), caption="Table 5.4")
+```
+
+## Discussion
+
+### Table 6.1
+
+```{r}
+load("./DICs/M0_W_FR_DIC.Rdata")
+load("./DICs/M0_W_DIC.Rdata")
+load("./DICs/M0_MPCF_DIC.Rdata") 
+load("./DICs/M0_MPCF_FR_DIC.Rdata")
+```
+
+```{r}
+c1 <- c("MPCF Fr.", "MPCF", "Weibull Fr.", "Weibull")
+c2 <- c(sum(M0.MPCF.FR.DIC$deviance), sum(M0.MPCF.DIC$deviance), sum(M0.W.FR.DIC$deviance), sum(M0.W.DIC$deviance))
+c3 <- round(c(0, sum(M0.MPCF.DIC$deviance)-sum(M0.MPCF.FR.DIC$deviance), sum(M0.W.FR.DIC$deviance)-sum(M0.MPCF.DIC$deviance), sum(M0.W.DIC$deviance)-sum(M0.W.FR.DIC$deviance)),0)
+c4 <- round(c(0, sum(M0.MPCF.DIC$deviance)-sum(M0.MPCF.FR.DIC$deviance), sum(M0.W.FR.DIC$deviance)-sum(M0.MPCF.FR.DIC$deviance), sum(M0.W.DIC$deviance)-sum(M0.MPCF.FR.DIC$deviance)),0)
+data <- data.frame(c1, c2, c3, c4)
+colnames(data) <- c("Model", "DIC", "VS Previous Model", "VS Best Model")
+
+kable(data, align = c("c", "c", "c", "c"), caption="Table 6.1")
+```
+
+
+---  
+
+<div/>
+<div class="tocify-extend-page" data-unique="tocify-extend-page" style="height: 0;"></div>

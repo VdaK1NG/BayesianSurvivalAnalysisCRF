@@ -1,0 +1,2058 @@
+---
+title: "Figuras TFM"
+author: "Pablo Escobar Hernández"
+output: 
+  html_document:
+    fig_caption: true
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1800px !important;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+</style>
+
+<div style="text-align: justify">
+
+## Libraries
+
+|       First, let's begin with loading the libraries required. If you don't have them install, just use the command `install.package`.
+
+```{r}
+library("haven")
+library("dplyr")
+library("parallel")
+library("ggplot2")
+library("tidyr")
+library("kableExtra")
+library("gridExtra")
+library("ggcorrplot")
+library("rjags")
+```
+
+## Specific Functions
+
+|       Next, we will define some functions that will be using to create the figures:
+
+```{r}
+summary_parameters <- function(table) {
+  table <- cbind(apply(table, 1, mean), apply(table, 1, sd),
+    t(apply(table, 1, quantile, probs = c(0.025, 0.5, 0.975))))
+    colnames(table) <- c("Mean", "Sd", "2.5%", "Median", "97.5%")
+  return(table)
+}
+
+
+fk_cr <- function(u.vect, lambda, alpha, beta, x, k) {
+          res <- sapply(u.vect, function(u) {
+          # Cause-specific hazard
+          hk <- lambda[k] * alpha[k] * (u^(alpha[k] - 1)) * exp(sum(unlist(beta[, k]) * x))
+          # Cumulative cause-specific hazard
+          Hk <- lambda * (rep(u,length(lambda))^alpha) * exp((t(beta) %*% matrix(x, ncol = 1))[, 1])
+          # Cause-specific hazard x Overall survival
+          aux <- hk * exp(-sum(Hk))
+          return(aux)
+        })
+           return(res)
+}
+         
+cif_cr <- function(tt, lambda, alpha, beta, x, k) {
+       return(integral(fk_cr, xmin = 0, xmax = tt, method = "Simpson", lambda = lambda,
+                        alpha = alpha, beta = beta, x = x, k = k))
+}
+         
+mcmc_cif_cr <- function(obj, t.pred, x) {
+        # Put all chains together
+        var.names <- names(obj)
+        # Indices of alpha's, beta's, and lambda's
+        a.idx <- which(substr(var.names, 1, 5) == "alpha")
+        b.idx <- which(substr(var.names, 1, 4) == "beta")
+        l.idx <- which(substr(var.names, 1, 6) == "lambda")
+        # Number of causes
+        K <- length(a.idx)
+        # Number of covariates
+        n.b <- length(b.idx) / K
+        # Sub-sample to speed up computations
+        samples.idx <- sample(1:nrow(obj), 200)
+           
+        res <- lapply(1:K, function(k) {
+          sapply(t.pred, function(tt) {
+            aux <- mclapply(samples.idx, function(i) {
+              cif_cr(tt, alpha = unlist(obj[i, a.idx]), lambda = unlist(obj[i, l.idx]),
+                    beta = matrix(unlist(c(obj[i, b.idx])), nrow = n.b), x = x, k = k)
+            })
+            return(mean(unlist(aux)))
+          })
+        })
+        return(res)
+}
+```
+
+## Load and Prepare Data
+
+```{r}
+# LOAD DATA
+data <- read_sav("data.sav")
+
+# SELECT VARIABLES AND DEFINE CATEGORICAL VARIABLES AS FACTORS
+datos <- data %>% select(Age, Sex, AetiologyCat, Obesity, Hypertension, Diabetes, Dyslipidemia, Heartdisease, Pneumopathy, 
+                         CKD, Bblockers, Rifaximin, Lactulose, PPIs, ChilPughclass, MELD, Varices, AlbgDL, Br, INR, Cr, Na,
+                         Platelets, ULN, TimeEventACLForTransplant, ACLForTransplant, Hospital)
+
+datos$Sex <- as_factor(datos$Sex)
+datos$AetiologyCat <- as_factor(datos$AetiologyCat)
+datos$Obesity <- as_factor(datos$Obesity)
+datos$Hypertension <- as_factor(datos$Hypertension)
+datos$Pneumopathy <- as_factor(datos$Pneumopathy)
+datos$Diabetes <- as_factor(datos$Diabetes)
+datos$Dyslipidemia <- as_factor(datos$Dyslipidemia)
+datos$Hospital <- as_factor(datos$Hospital)
+datos$CKD <- as_factor(datos$CKD)
+datos$Bblockers <- as_factor(datos$Bblockers)
+datos$Rifaximin <- as_factor(datos$Rifaximin)
+datos$Lactulose <- as_factor(datos$Lactulose)
+datos$PPIs <- as_factor(datos$PPIs)
+datos$ChilPughclass <- as_factor(datos$ChilPughclass)
+datos$Varices <- as_factor(datos$Varices)
+datos$ACLForTransplant <- as_factor(datos$ACLForTransplant)
+
+# SELECT FINAL GROUP OF VARIABLES USED FOR THE ANALYSIS
+datos.multi <- datos %>% select(Age, Sex, AetiologyCat, Diabetes, Bblockers, ChilPughclass, MELD, AlbgDL, Br, INR, Cr, ULN, TimeEventACLForTransplant, ACLForTransplant, Hospital)
+
+# REMOVE NAs AND ROWS WITH EMPTY VALUES
+datos.multi <- datos.multi %>% drop_na()
+datos.multi <- datos.multi[-c(331,271),]
+
+# DEFINE SEVERAL VARIABLES USED IN THE FUTURE
+time <- datos.multi$TimeEventACLForTransplant
+t <- seq(0,round(2453,dig=3),by=5) # time data for predictions
+
+# CREATE INTERVALS FOR THE MIXTURE OF PIECEWISE CONSTANT FUNCTIONS
+a <- c(0,25.01,50.01,75.01,100.01,125.01,150.01,200.01,250.01,350.01,455.01,1000.01,2453.001) 
+J <- 12
+d <- matrix(data=NA, nrow=length(t),ncol=J)
+int.obs <- matrix(data=NA, nrow=length(t),ncol=J)
+for (i in 1:length(t)) {
+  for (k in 1:J) {
+    d[i,k] = (if(t[i]-a[k]>0) {1} else {0}) *(if(a[k+1] - t[i]>0) {1} else {0} )
+    int.obs[i,k]<-d[i,k]*k
+  }
+} 
+int.obs <- rowSums(int.obs)
+c <- which(int.obs==0)
+int.obs[c] <- 1 
+pp<-table(int.obs)
+
+# DEFINE COLORS
+cols <- c("ACLF" = "#4169E1", "Transplant" = "#DB7093")
+```
+
+## Methods {.tabset}
+
+### Figure 2.1
+
+```{r}
+ini <- c(0,1,3,2,0.5,6.5,1.5)   # RECRUITMENT DATES
+fin.1 <- c(3.5,9,7,6.5,3.5,8,6.5) # FINAL DATE
+com <- c(1,0,0,1,1,0,1)         # CENSORSHIP
+sup <- fin.1-ini  
+datos0 <- data.frame(cbind(inicio=ini,final=fin.1,supervivencia=sup,
+                           censura=factor(com,labels=c('censurado','completo'))))
+
+fig1 <- ggplot(data=datos0) + 
+  geom_point(aes(y=1:7, x=fin.1, col=as.factor(censura)), cex=3) +
+  scale_color_manual(name="Censorship", labels=c("Event", "Censored"), values=c("#FF33FF", "33FFFF")) +
+  xlim(0,9.5) + ylim(0,7.5) +
+  geom_text(aes(y=1:7+0.3, x=fin+0.15, label=c("1", "2", "3", "4", "5", "6", "7"))) +
+  geom_segment(aes(x=ini[1], xend=fin[1]-0.04, y=1, yend=1)) +
+  geom_segment(aes(x=ini[2], xend=fin.1[2]-0.04, y=2, yend=2)) +
+  geom_segment(aes(x=ini[3], xend=fin[3]-0.04, y=3, yend=3)) +
+  geom_segment(aes(x=ini[4], xend=fin[4]-0.04, y=4, yend=4)) +
+  geom_segment(aes(x=ini[5], xend=fin[5]-0.04, y=5, yend=5)) +
+  geom_segment(aes(x=ini[6], xend=fin[6]-0.04, y=6, yend=6)) +
+  geom_segment(aes(x=ini[7], xend=fin[7]-0.04, y=7, yend=7)) +
+  geom_vline(xintercept = 1, linetype="dashed", col="blue") +
+  geom_vline(xintercept = 8, linetype="dashed", col="blue") +
+  xlab("Time") + ylab("Individual") + labs(subtitle="a) Swimming Plot") +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+ini <- c(0,1,3,2,0.5,6.5,1.5)   # RECRUITMENT DATES
+fin <- c(3.5,8,7,6.5,3.5,8,6.5) # FINAL DATE
+com <- c(1,1,0,1,1,0,1)         # CENSORSHIP
+sup <- fin-ini  
+datos1 <- data.frame(cbind(inicio=ini,final=fin,supervivencia=sup,
+                           censura=factor(com,labels=c('censurado','completo'))))
+  
+fig2 <- ggplot(data=datos1) + 
+  geom_point(aes(y=1:7, x=fin-ini, col=as.factor(censura)), cex=3) +
+  scale_color_manual(name="Censorship", labels=c("Event", "Censored"), values=c("#FF33FF", "33FFFF")) +
+  xlim(0,7.5) + ylim(0,7.5) +
+  geom_text(aes(y=1:7+0.3, x=fin-ini+0.15, label=c("1", "2", "3", "4", "5", "6", "7"))) +
+  geom_segment(aes(x=0, xend=fin[1]-ini[1]-0.04, y=1, yend=1)) +
+  geom_segment(aes(x=0, xend=7, y=2, yend=2)) +
+  geom_segment(aes(x=0, xend=fin[3]-ini[3]-0.04, y=3, yend=3)) +
+  geom_segment(aes(x=0, xend=fin[4]-ini[4]-0.04, y=4, yend=4)) +
+  geom_segment(aes(x=0, xend=fin[5]-ini[5]-0.04, y=5, yend=5)) +
+  geom_segment(aes(x=0, xend=fin[6]-ini[6]-0.04, y=6, yend=6)) +
+  geom_segment(aes(x=0, xend=fin[7]-ini[7]-0.04, y=7, yend=7)) +
+  geom_vline(xintercept = 0, linetype="dashed", col="blue") +
+  geom_vline(xintercept = 7, linetype="dashed", col="blue") +
+  xlab("Time under study") + ylab("Individual") + labs(subtitle="b) Swimming Plot Study Time") +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+grid.arrange(fig1, fig2, ncol=2)
+```
+
+## Descriptive Analysis {.tabset}
+
+### Figure 3.1
+
+```{r}
+fig1 <- ggplot(data = datos.multi) +
+  geom_density(aes(x=TimeEventACLForTransplant), col = "black", fill = "black", alpha=0.3, cex=1.05) +
+  labs(y= "Density", x = "Time", subtitle = "a) Global distribution") + #cambiar etiquetas ejes
+  ylim(0,0.004) +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"))
+
+fig2 <- ggplot(data = datos.multi %>% group_by(Hospital)) +
+  geom_density(aes(x=TimeEventACLForTransplant, col = Hospital, fill = Hospital), alpha=0.3, cex=1.05) + 
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) + 
+  scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+  ylim(0,0.004) +
+  labs(y= "Density", x = "Time", subtitle = "b) Distribution per Hospital") + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"))
+
+grid.arrange(fig1, fig2, ncol=2)
+```
+
+### Figure 3.2
+
+```{r}
+fig1 <- ggplot(datos.multi %>% group_by(Hospital), aes(TimeEventACLForTransplant, fill=Hospital)) +
+      geom_boxplot() +
+      coord_flip() +
+      scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+      labs(title="TEAOT Boxplot", x = "TEAOT", y = "Hospital") + #cambiar etiquetas ejes
+      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+            axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+            axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+            panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+            axis.ticks.y=element_blank(), #quitar etiquetas eje y
+            legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+            legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+fig2 <- ggplot(datos.multi %>% group_by(Hospital), aes(ULN, fill=Hospital)) +
+  geom_boxplot() +
+  coord_flip() +
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+  labs(title="ULN Boxplot", x = "ULN", y = "Hospital") + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        axis.ticks.y=element_blank(), #quitar etiquetas eje y
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+fig3 <- ggplot(datos.multi %>% group_by(Hospital), aes(MELD, fill=Hospital)) +
+  geom_boxplot() +
+  coord_flip() +
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+  labs(title="MELD Boxplot", x = "MELD", y = "Hospital") + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        axis.ticks.y=element_blank(), #quitar etiquetas eje y
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+fig4 <- ggplot(datos.multi %>% group_by(Hospital), aes(AlbgDL, fill=Hospital)) +
+  geom_boxplot() +
+  coord_flip() +
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+  labs(title="AlbgDL Boxplot", x = "AlbgDL", y = "Hospital") + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        axis.ticks.y=element_blank(), #quitar etiquetas eje y
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+fig5 <- ggplot(datos.multi %>% group_by(Hospital), aes(INR, fill=Hospital)) +
+  geom_boxplot() +
+  coord_flip() +
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+  labs(title="INR Boxplot", x = "INR", y = "Hospital") + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        axis.ticks.y=element_blank(), #quitar etiquetas eje y
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+fig6 <- ggplot(datos.multi %>% group_by(Hospital), aes(Br, fill=Hospital)) +
+  geom_boxplot() +
+  coord_flip() +
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+  labs(title="Br Boxplot", x = "Br", y = "Hospital") + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        axis.ticks.y=element_blank(), #quitar etiquetas eje y
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+fig7 <- ggplot(datos.multi %>% group_by(Hospital), aes(Cr, fill=Hospital)) +
+  geom_boxplot() +
+  coord_flip() +
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+  labs(title="Cr Boxplot", x = "Cr", y = "Hospital") + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        axis.ticks.y=element_blank(), #quitar etiquetas eje y
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+fig8 <- ggplot(datos.multi %>% group_by(Hospital), aes(Age, fill=Hospital)) +
+  geom_boxplot() +
+  coord_flip() +
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+  labs(title="Age Boxplot", x = "Age", y = "Hospital") + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        axis.ticks.y=element_blank(), #quitar etiquetas eje y
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+grid.arrange(fig1, fig2, fig3, fig4, fig5, fig6, fig7, fig8, ncol=3)
+```
+
+### Figure 3.3 
+
+```{r}
+fig1 <- ggplot(datos.multi, 
+               aes(Hospital, fill=Hospital)) +
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+  geom_bar(position=position_dodge()) +
+  labs(title="Hospital Distribution", y= "", x = "") + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+fig2 <- ggplot(datos.multi, 
+               aes(Hospital, fill=ACLForTransplant)) + 
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA"), name = "AOT") +
+  geom_bar(position=position_dodge()) +
+  labs(title="AOT Distribution", y= "", x = "") + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+fig3 <- ggplot(datos.multi %>% group_by(Hospital), 
+              aes(Hospital, fill=Sex)) + 
+  scale_fill_manual(values=c("#4169E1","#DB7093")) +
+  geom_bar(position=position_dodge()) +
+  labs(title="Sex Distribution", y= "", x = "") + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+fig4 <- ggplot(datos.multi %>% group_by(Hospital), 
+               aes(Hospital, fill=Diabetes)) + 
+  scale_fill_manual(values=c("#4169E1","#DB7093")) +
+  geom_bar(position=position_dodge()) +
+  labs(title="Diabetes Distribution", y= "", x = "") + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+fig5 <- ggplot(datos.multi %>% group_by(Hospital), 
+               aes(Hospital, fill=AetiologyCat)) + 
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA", "#8A2BE2", "#DAA520"), name = "Aet. Cat.") +
+  geom_bar(position=position_dodge()) +
+  labs(title="Aet. Cat. Distribution", y= "", x = "") + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+fig6 <- ggplot(datos.multi %>% group_by(Hospital), 
+               aes(Hospital, fill=ChilPughclass)) + 
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA"), name="Chil. Pugh.") +
+  geom_bar(position=position_dodge()) +
+  labs(title="Chil. Pugh. Distribution", y= "", x = "") + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+fig7 <- ggplot(datos.multi %>% group_by(Hospital), 
+               aes(Hospital, fill=Bblockers)) + 
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA"), name="Bblockers") +
+  geom_bar(position=position_dodge()) +
+  labs(title="Bblockers Distribution", y= "", x = "") + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+
+
+grid.arrange(arrangeGrob(fig3, fig4, fig7, ncol=3), arrangeGrob(fig1, fig2, ncol=2), arrangeGrob(fig5, fig6, ncol=2), ncol=1)
+```
+
+### Figure 3.4 and 3.5
+
+```{r}
+#ESTIMATE MAHALANNOBIS DISTANCE
+x <- datos.multi %>% select(TimeEventACLForTransplant, ULN, Hospital, ACLForTransplant) # SELECT DATA
+x1 <- x[,1:2] # SELECT VARIABLES
+ma <- mahalanobis(x1, apply(x1, 2, mean, na.rm = TRUE), cov(x1, use = "na.or.complete")) # DISTANCE
+ma <- data.frame(x1=1:725, y2=ma, Hospital=as.factor(x$Hospital), Event=as.factor(x$ACLForTransplant)) # CREATE DATA FRAME
+k <- dim(x)[2] # NUMBER OF VARIABLES
+Lim <- k + 3 * sqrt(k * 2) # LIMIT
+
+# PLOT DATA
+ggplot(ma, aes(x=x1, y=y2, col=Hospital)) +
+ geom_point(alpha=0.5, shape=20, size=3) +
+ scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+ geom_line(aes(y=Lim, x=1:725),colour="purple") + #Añadir línea horizontal
+ geom_text(aes(label=1:725),hjust=-0.5, vjust=0, size=3) + #Añadir número a cada punto
+ labs(title="", y= "Mahalanobis distance", x = "Index") + #cambiar etiquetas ejes
+ theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+       axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+       axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+       panel.border = element_rect(colour = "black", fill=NA, size=0.3)) #cambiar bordes grafico
+
+ggplot(ma, aes(x=x1, y=y2, col=Event)) +
+ geom_point(alpha=0.5, shape=20, size=3) +
+ scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+ geom_line(aes(y=Lim, x=1:725),colour="purple") + #Añadir línea horizontal
+ geom_text(aes(label=1:725),hjust=-0.5, vjust=0, size=3) + #Añadir número a cada punto
+ labs(title="", y= "Mahalanobis distance", x = "Index") + #cambiar etiquetas ejes
+ theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+       axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+       axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+       panel.border = element_rect(colour = "black", fill=NA, size=0.3)) #cambiar bordes grafico
+```
+
+### Figure 3.6
+
+```{r}
+# CREATE CORRELATION MATRIX
+cor <- model.matrix(~0+., data=datos.multi[, c(1,7:13)]) %>% cor(use="pairwise.complete.obs") 
+rownames(cor) <- c("Age", "MELD", "AlbgDL", "Br", "INR", "Cr", "ULN", "TEAOT")
+colnames(cor) <- c("Age", "MELD", "AlbgDL", "Br", "INR", "Cr", "ULN", "TEAOT")
+pmat <- cor_pmat(model.matrix(~0+., data=datos.multi[, c(1,7:13)]))
+rownames(pmat) <- c("Age", "MELD", "AlbgDL", "Br", "INR", "Cr", "ULN", "TEAOT")
+colnames(pmat) <- c("Age", "MELD", "AlbgDL", "Br", "INR", "Cr", "ULN", "TEAOT")
+
+# PLOT DATA
+ggcorrplot(cor, p.mat = pmat, show.diag = F, type="lower", lab=TRUE, lab_size=6, tl.cex = 12,
+          colors = c("#4169E1", "white", "#DB7093")) + #cambiar etiquetas ejes
+labs(x="", y="") +
+theme(panel.background = element_rect(fill = "lightgray",colour = "lightgray"),
+     plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+     axis.title.x = element_text(size=0, face="bold", colour = "black"), #cambiar estilo eje x
+     axis.title.y = element_text(size=0, face="bold", colour = "black"), #cambiar estilo eje y
+     panel.border = element_rect(colour = "black", fill=NA, size=0.3)) #cambiar bordes grafico
+```
+
+### Figure 3.7
+
+```{r}
+datos <- datos %>% rename(TEAOT = TimeEventACLForTransplant, AOT = ACLForTransplant)
+HCUV.na <- t(datos %>% filter(Hospital=="HCUV") %>% summarise_all(funs(sum(is.na(.)))))
+HCUV.na <- as.data.frame(HCUV.na)
+HCUV.na$Variable <- rownames(HCUV.na)
+HCUV.na <- HCUV.na %>% rename(NAs = V1)
+HCUV.na$Hospital <- rep("HCUV", length(rownames(HCUV.na)))
+    
+KCH.na <- t(datos %>% filter(Hospital=="KCH") %>% summarise_all(funs(sum(is.na(.)))))
+KCH.na <- as.data.frame(KCH.na)
+KCH.na$Variable <- rownames(KCH.na)
+KCH.na <- KCH.na %>% rename(NAs = V1)
+KCH.na$Hospital <- rep("KCH", length(rownames(KCH.na)))
+    
+RFH.na <- t(datos %>% filter(Hospital=="RFH") %>% summarise_all(funs(sum(is.na(.)))))
+RFH.na <- as.data.frame(RFH.na)
+RFH.na$Variable <- rownames(RFH.na)
+RFH.na <- RFH.na %>% rename(NAs = V1)
+RFH.na$Hospital <- rep("RFH", length(rownames(RFH.na)))
+    
+NA.data <- rbind(HCUV.na, KCH.na, RFH.na)
+  
+ggplot(data=NA.data %>% group_by(Variable,Hospital) %>% summarize_at("NAs",sum), aes(Variable,NAs,fill=Hospital)) +
+    geom_bar(stat="identity") + 
+    scale_fill_manual(values=c("#DB7093", "#66CDAA", "#4169E1")) +
+    theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), 
+          axis.title.x = element_text(size=14, face="bold", colour = "black"), 
+          axis.title.y = element_text(size=14, face="bold", colour = "black"), 
+          panel.border = element_rect(colour = "black", fill=NA, size=0.3), 
+          legend.title = element_text(size=10, face="bold", colour = "black"), 
+          legend.text = element_text(size=8, colour = "black"),
+          axis.text.x = element_text(angle = 50, vjust = 1, hjust=1)) 
+```
+
+## Univariable Models
+
+|       First, we need to load the Rdata files of the models.  Depending on the RAM memory of your computer, you may encounter a problem loading all of them at once.
+
+```{r}
+load("./Models RData/ULN_W_100K.Rdata")  
+load("./Models RData/ULN_MPCF_100K.Rdata") 
+load("./Models RData/ULN_FR_100K.Rdata") 
+load("./Models RData/ULN_MPCF_FR_100K.Rdata") 
+```
+
+### Weibull
+
+#### Extract Data
+
+```{r}
+result <- as.mcmc(do.call(rbind, ULN.W.100K))
+    
+alpha1 <- result[, 1]
+alpha2 <- result[, 2]
+    
+beta1 <- result[, 3]
+beta2 <- result[, 4]
+    
+lambda1 <- result[, 5]
+lambda2 <- result[, 6]
+
+# SUBSAMPLE TO SPEED UP COMPUTATION TIMES
+samples.idx <- sample(1:nrow(result), 200)
+result.subsample <- result[samples.idx,]
+result.subsample <- as.data.frame(result.subsample)
+```
+
+#### Figure 4.1
+
+```{r}
+table2 <- gelman.diag(ULN.W.100K, multivariate = TRUE)
+type <- c(rep("Point est.", length(table2$psrf[,1])), rep("Upper C.I.", length(table2$psrf[,1])))
+rhat <- data.frame(x = rep(1:length(table2$psrf[,1]), 2), Type = type, Rhat = c(as.numeric(table2$psrf[,1]), as.numeric(table2$psrf[,2])))
+
+ggplot(data = rhat) +
+  geom_point(aes(x=x, y=Rhat, col=Type), alpha=0.4) +
+  scale_colour_manual(values=c("#4169E1", "#DB7093")) + 
+  geom_hline(yintercept = 1.1, col="black") +
+  labs(x="Parameter Index", y="PSRF") +
+  labs(title="PSRF values for the parameters estimated") +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+```
+
+#### Figure 4.2
+
+##### Log-Baseline Hazard Function
+
+```{r}
+log.h0.ACLF <- matrix(data = rep(NA, length(t) * length(samples.idx)), nrow = length(samples.idx), ncol = length(t))
+
+for(j in 1:length(samples.idx)){
+  
+  for(i in 1:length(t)){
+    
+    log.h0.ACLF[j,i] <- log(result.subsample$`lambda[1]`[j]*result.subsample$`alpha[1]`[j]*t[i]^(result.subsample$`alpha[1]`[j]-1))
+  }
+}
+
+log.h0.ACLF.mean<-apply(log.h0.ACLF,2,mean,na.rm=TRUE)
+log.h0.ACLF.q2.5<-apply(log.h0.ACLF,2,quantile,probs=0.025,na.rm=TRUE)
+log.h0.ACLF.q97.5<-apply(log.h0.ACLF,2,quantile,probs=0.975,na.rm=TRUE)     
+
+log.h0.ACLF.W.df <- data.frame(time=rep(t), log.h0med = c(log.h0.ACLF.mean), 
+                             log.h0lwr=log.h0.ACLF.q2.5, log.h0upr=log.h0.ACLF.q97.5)
+
+log.h0.Trp <- matrix(data = rep(NA, length(t) * length(samples.idx)), nrow = length(samples.idx), ncol = length(t))
+
+for(j in 1:length(samples.idx)){
+  
+  for(i in 1:length(t)){
+    
+    log.h0.Trp[j,i] <- log(result.subsample$`lambda[2]`[j]*result.subsample$`alpha[2]`[j]*t[i]^(result.subsample$`alpha[2]`[j]-1))
+  }
+}
+
+log.h0.Trp.mean <- apply(log.h0.Trp, 2, mean, na.rm=TRUE)
+log.h0.Trp.q2.5 <- apply(log.h0.Trp, 2, quantile, probs=0.025, na.rm=TRUE)
+log.h0.Trp.q97.5 <- apply(log.h0.Trp, 2, quantile, probs=0.975, na.rm=TRUE)     
+
+log.h0.Trp.W.df <- data.frame(time=rep(t), log.h0med = c(log.h0.Trp.mean), 
+                            log.h0lwr=log.h0.Trp.q2.5, log.h0upr=log.h0.Trp.q97.5)
+
+fig1 <- ggplot() + 
+  scale_colour_manual(values=cols, name="Event") +
+  geom_errorbar(data=log.h0.ACLF.W.df, mapping=aes(x=time, ymin=log.h0lwr, ymax=log.h0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=log.h0.ACLF.W.df, mapping=aes(x=time, y=log.h0med,colour="ACLF"), size=1) + 
+  geom_errorbar(data=log.h0.Trp.W.df, mapping=aes(x=time, ymin=log.h0lwr, ymax=log.h0upr, colour="Transplant"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=log.h0.Trp.W.df, mapping=aes(x=time, y=log.h0med,colour="Transplant"), size=1) + 
+  labs(x="Time (days)", y="", subtitle="a) Log Baseline Hazard Function") + 
+  xlim(0,2500) + 
+  scale_linetype_manual(values = c("solid")) + 
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+        legend.position = c(0.8, 0.8)) # cambiar posicion leyenda  
+```
+
+##### Survival Baseline Function
+
+```{r}
+S0.ACLF <- matrix(data = rep(NA, length(t) * length(samples.idx)), nrow = length(samples.idx), ncol = length(t))
+    
+for(j in 1:length(samples.idx)){
+  
+  for(i in 1:length(t)){
+    
+    S0.ACLF[j,i] <- exp(-(result.subsample$`lambda[1]`[j]*t[i]^result.subsample$`alpha[1]`[j]))
+  }
+}
+
+S0.ACLF.mean<-apply(S0.ACLF,2,mean,na.rm=TRUE)
+S0.ACLF.q2.5<-apply(S0.ACLF,2,quantile,probs=0.025,na.rm=TRUE)
+S0.ACLF.q97.5<-apply(S0.ACLF,2,quantile,probs=0.975,na.rm=TRUE)     
+     
+S0.ACLF.df <- data.frame(time=rep(t), S0med = c(S0.ACLF.mean), 
+                  S0lwr=S0.ACLF.q2.5, S0upr=S0.ACLF.q97.5)
+
+S0.Trp <- matrix(data = rep(NA, length(t) * length(samples.idx)), nrow = length(samples.idx), ncol = length(t))
+
+for(j in 1:length(samples.idx)){
+  
+  for(i in 1:length(t)){
+    
+    S0.Trp[j,i] <- exp(-(result.subsample$`lambda[2]`[j]*t[i]^result.subsample$`alpha[2]`[j]))
+  }
+}
+
+S0.Trp.mean <- apply(S0.Trp, 2, mean, na.rm=TRUE)
+S0.Trp.q2.5 <- apply(S0.Trp, 2, quantile, probs=0.025, na.rm=TRUE)
+S0.Trp.q97.5 <- apply(S0.Trp, 2, quantile, probs=0.975, na.rm=TRUE)     
+
+S0.Trp.df <- data.frame(time=rep(t), S0med = c(S0.Trp.mean), 
+                         S0lwr=S0.Trp.q2.5, S0upr=S0.Trp.q97.5)
+
+fig2 <- ggplot() + 
+  scale_colour_manual(values=cols, name="Event") +
+  geom_errorbar(data=S0.ACLF.df, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=S0.ACLF.df, mapping=aes(x=time, y=S0med,colour="ACLF"), size=1) + 
+  geom_errorbar(data=S0.Trp.df, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr,colour="Transplant"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=S0.Trp.df, mapping=aes(x=time, y=S0med,colour="Transplant"), size=1) + 
+  labs(x="Time (days)", y="", subtitle="b) Baseline Survival Function") + 
+  ylim(0,1)+
+  xlim(0,2500) + 
+  scale_linetype_manual(values = c("solid")) + 
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+        legend.position = c(0.2, 0.2)) # cambiar posicion leyenda        
+
+grid.arrange(fig1, fig2, ncol=2)
+```
+
+### MPCF
+
+#### Extract Data
+
+```{r}
+result <- as.mcmc(do.call(rbind, ULN.MPCF.100K))
+ 
+beta1 <- result[, 1]
+beta2 <- result[, 2]
+
+lambda1.1 <- result[, 3]
+lambda2.1 <- result[, 4]
+lambda3.1 <- result[, 5]
+lambda4.1 <- result[, 6]
+lambda5.1 <- result[, 7]
+lambda6.1 <- result[, 8]
+lambda7.1 <- result[, 9]
+lambda8.1 <- result[, 10]
+lambda9.1 <- result[, 11]
+lambda10.1 <- result[, 12]
+lambda11.1 <- result[, 13]
+lambda12.1 <- result[, 14]
+
+lambda1.2 <- result[, 15]
+lambda2.2 <- result[, 16]
+lambda3.2 <- result[, 17]
+lambda4.2 <- result[, 18]
+lambda5.2 <- result[, 19]
+lambda6.2 <- result[, 20]
+lambda7.2 <- result[, 21]
+lambda8.2 <- result[, 22]
+lambda9.2 <- result[, 23]
+lambda10.2 <- result[, 24]
+lambda11.2 <- result[, 25]
+lambda12.2 <- result[, 26]
+
+# SUBSAMPLE TO SPEED UP COMPUTATION TIMES
+samples.idx <- sample(1:nrow(result), 200)
+result.subsample <- result[samples.idx,]
+
+# EXTRACT DATA PER EVENT
+lambda.ACLF <- result.subsample[, 3:14]
+lambda.Trp <- result.subsample[, 15:26]
+```
+
+#### Figure 4.3
+
+##### Create Pieces
+
+```{r}
+K <- 20
+a <- seq(0, max(time) + 0.001, length.out = K + 1)
+
+int.obs <- matrix(data = NA, nrow = nrow(datos.multi), ncol = length(a) - 1)
+d <- matrix(data = NA, nrow = nrow(datos.multi), ncol = length(a) - 1)
+
+for(i in 1:nrow(datos.multi)) {
+  for (k in 1:(length(a) - 1)) {
+    d[i, k] <- ifelse(time[i] - a[k] > 0, 1, 0) * ifelse(a[k + 1] - time[i] > 0, 1, 0)
+    int.obs[i, k] <- d[i, k] * k
+  }
+}
+
+int.obs <- rowSums(int.obs)
+datos.multi$p20 <- int.obs
+
+##############################################################################################################
+K <- 10
+a <- seq(0, max(time) + 0.001, length.out = K + 1)
+
+int.obs <- matrix(data = NA, nrow = nrow(datos.multi), ncol = length(a) - 1)
+d <- matrix(data = NA, nrow = nrow(datos.multi), ncol = length(a) - 1)
+
+for(i in 1:nrow(datos.multi)) {
+  for (k in 1:(length(a) - 1)) {
+    d[i, k] <- ifelse(time[i] - a[k] > 0, 1, 0) * ifelse(a[k + 1] - time[i] > 0, 1, 0)
+    int.obs[i, k] <- d[i, k] * k
+  }
+}
+
+int.obs <- rowSums(int.obs)
+datos.multi$p10 <- int.obs
+
+##############################################################################################################
+K <- 5
+a <- seq(0, max(time) + 0.001, length.out = K + 1)
+
+int.obs <- matrix(data = NA, nrow = nrow(datos.multi), ncol = length(a) - 1)
+d <- matrix(data = NA, nrow = nrow(datos.multi), ncol = length(a) - 1)
+
+for(i in 1:nrow(datos.multi)) {
+  for (k in 1:(length(a) - 1)) {
+    d[i, k] <- ifelse(time[i] - a[k] > 0, 1, 0) * ifelse(a[k + 1] - time[i] > 0, 1, 0)
+    int.obs[i, k] <- d[i, k] * k
+  }
+}
+
+int.obs <- rowSums(int.obs)
+datos.multi$p5 <- int.obs
+
+##############################################################################################################
+K <- 12
+a <- c(0,25.01,50.01,75.01,100.01,125.01,150.01,200.01,250.01,350.01,455.01,1000.01,2453.001)
+
+int.obs <- matrix(data = NA, nrow = nrow(datos.multi), ncol = length(a) - 1)
+d <- matrix(data = NA, nrow = nrow(datos.multi), ncol = length(a) - 1)
+
+for(i in 1:nrow(datos.multi)) {
+  for (k in 1:(length(a) - 1)) {
+    d[i, k] <- ifelse(time[i] - a[k] > 0, 1, 0) * ifelse(a[k + 1] - time[i] > 0, 1, 0)
+    int.obs[i, k] <- d[i, k] * k
+  }
+}
+
+int.obs <- rowSums(int.obs)
+datos.multi$pm12 <- int.obs
+```
+
+##### Plot
+
+```{r}
+fig1 <- ggplot(datos.multi) +
+  geom_bar(aes(p5, fill=ACLForTransplant)) + 
+  scale_x_discrete(limits=c(1,2,3,4,5)) +
+  labs(subtitle="a) 5 Pieces", y= "Number of observations", x = "Piece") + 
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), 
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), 
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), 
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), 
+        legend.title = element_text(size=10, face="bold", colour = "black"), 
+        legend.text = element_text(size=8, colour = "black"),
+        axis.text.x = element_text(angle = 60, vjust = 1, hjust=1), 
+        legend.pos=c(0.8, 0.7)) 
+
+fig2 <- ggplot(datos.multi) +
+  geom_bar(aes(p10, fill=ACLForTransplant)) +
+  scale_x_discrete(limits = c(1,2,3,4,5,6,7,8,9,10)) +
+  labs(subtitle="b) 10 Pieces", y= "Number of observations", x = "Piece") + 
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), 
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), 
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), 
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), 
+        legend.title = element_text(size=10, face="bold", colour = "black"), 
+        legend.text = element_text(size=8, colour = "black"),
+        axis.text.x = element_text(angle = 60, vjust = 1, hjust=1), 
+        legend.pos=c(0.8, 0.7)) 
+
+fig3 <- ggplot(datos.multi) +
+  geom_bar(aes(p20, fill=ACLForTransplant)) +
+  scale_x_discrete(limits = c(1:20)) +
+  labs(subtitle="c) 20 Pieces", y= "Number of obsertavtions", x = "Piece") + 
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), 
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), 
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), 
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), 
+        legend.title = element_text(size=10, face="bold", colour = "black"), 
+        legend.text = element_text(size=8, colour = "black"),
+        axis.text.x = element_text(angle = 60, vjust = 1, hjust=1), 
+        legend.pos=c(0.8, 0.7)) 
+
+fig4 <- ggplot(datos.multi) +
+  geom_bar(aes(pm12, fill=ACLForTransplant)) +
+  labs(subtitle="d) 12 Manual Pieces", y= "Number of observations", x = "Piece") + 
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+  scale_x_discrete(limits = c(1:12)) +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), 
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), 
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), 
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), 
+        legend.title = element_text(size=10, face="bold", colour = "black"), 
+        legend.text = element_text(size=8, colour = "black"),
+        axis.text.x = element_text(angle = 60, vjust = 1, hjust=1), 
+        legend.pos=c(0.3, 0.8)) 
+
+grid.arrange(fig1, fig2, fig3, fig4, ncol=2)
+```
+
+#### Figure 4.4
+
+```{r}
+table2 <- gelman.diag(ULN.MPCF.100K, multivariate = TRUE)
+type <- c(rep("Point est.", length(table2$psrf[,1])), rep("Upper C.I.", length(table2$psrf[,1])))
+rhat <- data.frame(x = rep(1:length(table2$psrf[,1]), 2), Type = type, Rhat = c(as.numeric(table2$psrf[,1]), as.numeric(table2$psrf[,2])))
+
+ggplot(data = rhat) +
+  geom_point(aes(x=x, y=Rhat, col=Type), alpha=0.4) +
+  scale_colour_manual(values=c("#4169E1", "#DB7093")) + 
+  geom_hline(yintercept = 1.1, col="black") +
+  labs(x="Parameter Index", y="PSRF") +
+  labs(title="PSRF values for the parameters estimated") +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+```
+
+#### Figure 4.5
+
+##### Log-Baseline Hazard Function
+
+```{r}
+log.h0.ACLF <- log(lambda.ACLF)
+log.h0mean <- apply(log.h0.ACLF, 2, mean)
+log.h0q2.5 <- apply(log.h0.ACLF, 2, quantile, probs=0.025)
+log.h0q97.5 <- apply(log.h0.ACLF, 2, quantile, probs=0.975)
+
+df1 <- data.frame(time=rep(rep(a, 2)[-c(1,(J+1)*2)],1), h0med = c(rep(log.h0mean, 2)),h0lwr = c(rep(log.h0q2.5, 2)),h0upr= c(rep(log.h0q97.5, 2)))
+
+df2<-data.frame(time=t,
+                h0lwr=c(rep(log.h0q2.5[1],pp[1]), rep(log.h0q2.5[2],pp[2]), rep(log.h0q2.5[3],pp[3]),
+                        rep(log.h0q2.5[4],pp[4]), rep(log.h0q2.5[5],pp[5]), rep(log.h0q2.5[6],pp[6]),
+                        rep(log.h0q2.5[7],pp[7]), rep(log.h0q2.5[8],pp[8]), rep(log.h0q2.5[9],pp[9]),
+                        rep(log.h0q2.5[10],pp[10]), rep(log.h0q2.5[11],pp[11]), rep(log.h0q2.5[12],pp[12])),
+                h0upr=c(rep(log.h0q97.5[1],pp[1]), rep(log.h0q97.5[2],pp[2]), rep(log.h0q97.5[3],pp[3]),
+                        rep(log.h0q97.5[4],pp[4]), rep(log.h0q97.5[5],pp[5]), rep(log.h0q97.5[6],pp[6]),
+                        rep(log.h0q97.5[7],pp[7]), rep(log.h0q97.5[8],pp[8]), rep(log.h0q97.5[9],pp[9]),
+                        rep(log.h0q97.5[10],pp[10]), rep(log.h0q97.5[11],pp[11]), rep(log.h0q97.5[12],pp[12])))
+
+log.h0.Trp <- log(lambda.Trp)
+log.h0mean <- apply(log.h0.Trp, 2, mean)
+log.h0q2.5 <- apply(log.h0.Trp, 2, quantile, probs=0.025)
+log.h0q97.5 <- apply(log.h0.Trp, 2, quantile, probs=0.975)
+
+df3 <- data.frame(time=rep(rep(a, 2)[-c(1,(J+1)*2)],1), h0med = c(rep(log.h0mean, 2)),h0lwr = c(rep(log.h0q2.5, 2)),h0upr= c(rep(log.h0q97.5, 2)))
+
+df4 <-data.frame(time=t,
+                h0lwr=c(rep(log.h0q2.5[1],pp[1]), rep(log.h0q2.5[2],pp[2]), rep(log.h0q2.5[3],pp[3]),
+                        rep(log.h0q2.5[4],pp[4]), rep(log.h0q2.5[5],pp[5]), rep(log.h0q2.5[6],pp[6]),
+                        rep(log.h0q2.5[7],pp[7]), rep(log.h0q2.5[8],pp[8]), rep(log.h0q2.5[9],pp[9]),
+                        rep(log.h0q2.5[10],pp[10]), rep(log.h0q2.5[11],pp[11]), rep(log.h0q2.5[12],pp[12])),
+                h0upr=c(rep(log.h0q97.5[1],pp[1]), rep(log.h0q97.5[2],pp[2]), rep(log.h0q97.5[3],pp[3]),
+                        rep(log.h0q97.5[4],pp[4]), rep(log.h0q97.5[5],pp[5]), rep(log.h0q97.5[6],pp[6]),
+                        rep(log.h0q97.5[7],pp[7]), rep(log.h0q97.5[8],pp[8]), rep(log.h0q97.5[9],pp[9]),
+                        rep(log.h0q97.5[10],pp[10]), rep(log.h0q97.5[11],pp[11]), rep(log.h0q97.5[12],pp[12])))
+
+fig1 <- ggplot() + 
+  scale_colour_manual(values=cols, name="Event") +
+  geom_errorbar(data=df4, mapping=aes(x=time, ymin=h0lwr, ymax=h0upr, colour="Transplant"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=df3, mapping=aes(x=time, y=h0med, colour="Transplant"), size=1) + 
+  geom_errorbar(data=df2, mapping=aes(x=time, ymin=h0lwr, ymax=h0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=df1, mapping=aes(x=time, y=h0med, colour="ACLF"), size=1) + 
+  labs(x="Time (days)", y="", subtitle = "a)Log Baseline Hazard Function") +
+  scale_linetype_manual(values = c("solid")) + 
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+        legend.position = c(0.9, 0.8)) # cambiar posicion leyenda      
+```
+
+##### Survival Baseline Function
+
+```{r}
+dH0<-matrix(NA,nrow(lambda.ACLF),length(t))
+    
+for(j in 1:nrow(lambda.ACLF)){
+  for(i in 1:length(t)){
+    dH0[j,i] <-ifelse(t[i]>a[2],(a[2]-a[1])*lambda.ACLF[j,1],0)+
+      ifelse(t[i]>a[3],(a[3]-a[2])*lambda.ACLF[j,2],0)+
+      ifelse(t[i]>a[4],(a[4]-a[3])*lambda.ACLF[j,3],0)+
+      ifelse(t[i]>a[5],(a[5]-a[4])*lambda.ACLF[j,4],0)+
+      ifelse(t[i]>a[6],(a[6]-a[5])*lambda.ACLF[j,5],0)+
+      ifelse(t[i]>a[7],(a[7]-a[6])*lambda.ACLF[j,6],0)+
+      ifelse(t[i]>a[8],(a[8]-a[7])*lambda.ACLF[j,7],0)+
+      ifelse(t[i]>a[9],(a[9]-a[8])*lambda.ACLF[j,8],0)+
+      ifelse(t[i]>a[10],(a[10]-a[9])*lambda.ACLF[j,9],0)+
+      ifelse(t[i]>a[11],(a[11]-a[10])*lambda.ACLF[j,10],0)+
+      ifelse(t[i]>a[12],(a[12]-a[11])*lambda.ACLF[j,11],0)+
+      ((t[i] - a[int.obs[i]]) *lambda.ACLF[j,int.obs[i]])
+  }
+  
+}
+
+S0 <- matrix(NA,nrow(lambda.ACLF),length(t))
+
+for(j in 1:nrow(lambda.ACLF)){
+  for (i in 1:length(t)) {
+    S0[j,i]<- exp(-(dH0[j,i]))
+  }
+}
+
+S0mean <- apply(S0, 2, mean, na.rm=TRUE)
+S0q2.5 <- apply(S0, 2, quantile, probs=0.025, na.rm=TRUE)
+S0q97.5 <- apply(S0, 2, quantile, probs=0.975, na.rm=TRUE) 
+S0.ACLF.MPCF <- data.frame(time=rep(t), S0med = c(S0mean), S0lwr=S0q2.5, S0upr=S0q97.5)
+
+dH0<-matrix(NA,nrow(lambda.Trp),length(t))
+    
+for(j in 1:nrow(lambda.Trp)){
+  for(i in 1:length(t)){
+    dH0[j,i] <-ifelse(t[i]>a[2],(a[2]-a[1])*lambda.Trp[j,1],0)+
+      ifelse(t[i]>a[3],(a[3]-a[2])*lambda.Trp[j,2],0)+
+      ifelse(t[i]>a[4],(a[4]-a[3])*lambda.Trp[j,3],0)+
+      ifelse(t[i]>a[5],(a[5]-a[4])*lambda.Trp[j,4],0)+
+      ifelse(t[i]>a[6],(a[6]-a[5])*lambda.Trp[j,5],0)+
+      ifelse(t[i]>a[7],(a[7]-a[6])*lambda.Trp[j,6],0)+
+      ifelse(t[i]>a[8],(a[8]-a[7])*lambda.Trp[j,7],0)+
+      ifelse(t[i]>a[9],(a[9]-a[8])*lambda.Trp[j,8],0)+
+      ifelse(t[i]>a[10],(a[10]-a[9])*lambda.Trp[j,9],0)+
+      ifelse(t[i]>a[11],(a[11]-a[10])*lambda.Trp[j,10],0)+
+      ifelse(t[i]>a[12],(a[12]-a[11])*lambda.Trp[j,11],0)+
+      ((t[i] - a[int.obs[i]]) *lambda.Trp[j,int.obs[i]])
+  }
+  
+}
+
+S0 <- matrix(NA,nrow(lambda.Trp),length(t))
+
+for(j in 1:nrow(lambda.Trp)){
+  for (i in 1:length(t)) {
+    S0[j,i]<- exp(-(dH0[j,i]))
+  }
+}
+
+S0mean <- apply(S0, 2, mean, na.rm=TRUE)
+S0q2.5 <- apply(S0, 2, quantile, probs=0.025, na.rm=TRUE)
+S0q97.5 <- apply(S0, 2, quantile, probs=0.975, na.rm=TRUE) 
+S0.Trp.MPCF <- data.frame(time=rep(t), S0med = c(S0mean), S0lwr=S0q2.5, S0upr=S0q97.5)
+
+fig2 <- ggplot() + 
+  scale_colour_manual(values=cols, name="Event") +
+  geom_errorbar(data=S0.ACLF.MPCF, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=S0.ACLF.MPCF, mapping=aes(x=time, y=S0med,colour="ACLF"), size=1) + 
+  geom_errorbar(data=S0.Trp.MPCF, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr,colour="Transplant"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=S0.Trp.MPCF, mapping=aes(x=time, y=S0med,colour="Transplant"), size=1) + 
+  labs(x="Time (days)", y="", subtitle="b) Baseline Survival Function Weib. Fr.") + 
+  ylim(0,1)+
+  xlim(0,2500) + 
+  scale_linetype_manual(values = c("solid")) + 
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+        legend.position = c(0.2, 0.2)) # cambiar posicion leyenda        
+
+grid.arrange(fig1, fig2, ncol=2) 
+```
+
+### Weibull Frailty {.tabset}
+
+#### Extract Data
+
+```{r}
+result <- as.mcmc(do.call(rbind, ULN.FR.100K))
+    
+alpha1 <- result[, 1]
+alpha2 <- result[, 2]
+    
+beta1 <- result[, 3]
+beta2 <- result[, 4]
+    
+lambda1 <- result[, 5]
+lambda2 <- result[, 6]
+
+# SUBSAMPLE TO SPEED UP COMPUTATION TIME
+samples.idx <- sample(1:nrow(result), 200)
+result.subsample <- result[samples.idx,]
+result.subsample <- as.data.frame(result.subsample)
+```
+
+#### Figure 4.6
+
+```{r}
+table2 <- gelman.diag(ULN.FR.100K, multivariate = TRUE)
+type <- c(rep("Point est.", length(table2$psrf[,1])), rep("Upper C.I.", length(table2$psrf[,1])))
+rhat <- data.frame(x = rep(1:length(table2$psrf[,1]), 2), Type = type, Rhat = c(as.numeric(table2$psrf[,1]), as.numeric(table2$psrf[,2])))
+
+ggplot(data = rhat) +
+  geom_point(aes(x=x, y=Rhat, col=Type), alpha=0.4) +
+  scale_colour_manual(values=c("#4169E1", "#DB7093")) + 
+  geom_hline(yintercept = 1.1, col="black") +
+  labs(x="Parameter Index", y="PSRF")
+  labs(title="PSRF values for the parameters estimated") +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+```
+
+#### Figure 4.7
+
+##### Log-Baseline Hazard Function
+
+```{r}
+log.h0.ACLF <- matrix(data = rep(NA, length(t) * length(samples.idx)), nrow = length(samples.idx), ncol = length(t))
+
+for(j in 1:length(samples.idx)){
+  
+  for(i in 1:length(t)){
+    
+    log.h0.ACLF[j,i] <- log(result.subsample$`lambda[1]`[j]*result.subsample$`alpha[1]`[j]*t[i]^(result.subsample$`alpha[1]`[j]-1))
+  }
+}
+
+log.h0.ACLF.mean<-apply(log.h0.ACLF,2,mean,na.rm=TRUE)
+log.h0.ACLF.q2.5<-apply(log.h0.ACLF,2,quantile,probs=0.025,na.rm=TRUE)
+log.h0.ACLF.q97.5<-apply(log.h0.ACLF,2,quantile,probs=0.975,na.rm=TRUE)     
+
+log.h0.ACLF.W.FR.df <- data.frame(time=rep(t), log.h0med = c(log.h0.ACLF.mean), 
+                             log.h0lwr=log.h0.ACLF.q2.5, log.h0upr=log.h0.ACLF.q97.5)
+
+log.h0.Trp <- matrix(data = rep(NA, length(t) * length(samples.idx)), nrow = length(samples.idx), ncol = length(t))
+
+for(j in 1:length(samples.idx)){
+  
+  for(i in 1:length(t)){
+    
+    log.h0.Trp[j,i] <- log(result.subsample$`lambda[2]`[j]*result.subsample$`alpha[2]`[j]*t[i]^(result.subsample$`alpha[2]`[j]-1))
+  }
+}
+
+log.h0.Trp.mean <- apply(log.h0.Trp, 2, mean, na.rm=TRUE)
+log.h0.Trp.q2.5 <- apply(log.h0.Trp, 2, quantile, probs=0.025, na.rm=TRUE)
+log.h0.Trp.q97.5 <- apply(log.h0.Trp, 2, quantile, probs=0.975, na.rm=TRUE)     
+
+log.h0.Trp.W.FR.df <- data.frame(time=rep(t), log.h0med = c(log.h0.Trp.mean), 
+                            log.h0lwr=log.h0.Trp.q2.5, log.h0upr=log.h0.Trp.q97.5)
+
+fig1 <- ggplot() + 
+  scale_colour_manual(values=cols, name="Event") +
+  geom_errorbar(data=log.h0.ACLF.W.FR.df, mapping=aes(x=time, ymin=log.h0lwr, ymax=log.h0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=log.h0.ACLF.W.FR.df, mapping=aes(x=time, y=log.h0med,colour="ACLF"), size=1) + 
+  geom_errorbar(data=log.h0.Trp.W.FR.df, mapping=aes(x=time, ymin=log.h0lwr, ymax=log.h0upr, colour="Transplant"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=log.h0.Trp.W.FR.df, mapping=aes(x=time, y=log.h0med,colour="Transplant"), size=1) + 
+  labs(x="Time (days)", y="", subtitle="a) Log Baseline Hazard Function") + 
+  xlim(0,2500) + 
+  scale_linetype_manual(values = c("solid")) + 
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+        legend.position = c(0.8, 0.8)) # cambiar posicion leyenda  
+```
+
+##### Survival Baseline Function
+
+```{r}
+S0.ACLF <- matrix(data = rep(NA, length(t) * length(samples.idx)), nrow = length(samples.idx), ncol = length(t))
+    
+for(j in 1:length(samples.idx)){
+  
+  for(i in 1:length(t)){
+    
+    S0.ACLF[j,i] <- exp(-(result.subsample$`lambda[1]`[j]*t[i]^result.subsample$`alpha[1]`[j]))
+  }
+}
+
+S0.ACLF.mean<-apply(S0.ACLF,2,mean,na.rm=TRUE)
+S0.ACLF.q2.5<-apply(S0.ACLF,2,quantile,probs=0.025,na.rm=TRUE)
+S0.ACLF.q97.5<-apply(S0.ACLF,2,quantile,probs=0.975,na.rm=TRUE)     
+     
+S0.ACLF.df <- data.frame(time=rep(t), S0med = c(S0.ACLF.mean), 
+                  S0lwr=S0.ACLF.q2.5, S0upr=S0.ACLF.q97.5)
+
+S0.Trp <- matrix(data = rep(NA, length(t) * length(samples.idx)), nrow = length(samples.idx), ncol = length(t))
+
+for(j in 1:length(samples.idx)){
+  
+  for(i in 1:length(t)){
+    
+    S0.Trp[j,i] <- exp(-(result.subsample$`lambda[2]`[j]*t[i]^result.subsample$`alpha[2]`[j]))
+  }
+}
+
+S0.Trp.mean <- apply(S0.Trp, 2, mean, na.rm=TRUE)
+S0.Trp.q2.5 <- apply(S0.Trp, 2, quantile, probs=0.025, na.rm=TRUE)
+S0.Trp.q97.5 <- apply(S0.Trp, 2, quantile, probs=0.975, na.rm=TRUE)     
+
+S0.Trp.df <- data.frame(time=rep(t), S0med = c(S0.Trp.mean), 
+                         S0lwr=S0.Trp.q2.5, S0upr=S0.Trp.q97.5)
+
+fig2 <- ggplot() + 
+  scale_colour_manual(values=cols, name="Event") +
+  geom_errorbar(data=S0.ACLF.df, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=S0.ACLF.df, mapping=aes(x=time, y=S0med,colour="ACLF"), size=1) + 
+  geom_errorbar(data=S0.Trp.df, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr,colour="Transplant"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=S0.Trp.df, mapping=aes(x=time, y=S0med,colour="Transplant"), size=1) + 
+  labs(x="Time (days)", y="", subtitle="b) Baseline Survival Function") + 
+  ylim(0,1)+
+  xlim(0,2500) + 
+  scale_linetype_manual(values = c("solid")) + 
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+        legend.position = c(0.2, 0.2)) # cambiar posicion leyenda        
+
+grid.arrange(fig1, fig2, ncol=2)
+```
+
+#### Figure 4.8
+
+```{r}
+w <- as.vector(rep(NA,725))
+  
+for (i in 7:731){
+  w[i] <- mean(result[, i])
+}
+w <- as.data.frame(w, ncol=1)
+
+w <- drop_na(w)
+datos.multi$w.w <- w$w
+
+fig1.1 <- ggplot(data=datos.multi %>% filter(Hospital=="RFH")) +
+    geom_point(aes(x=1:141, y=w.w, col=Hospital)) +
+    scale_colour_manual(values=c("#4169E1")) +
+    labs(subtitle = "a) RFH Weibull Fr.") + ylim(0.9, 1.05) + ylab("w[i]") + xlab("Patient ID") +
+    theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+          axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+          axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+          panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+          legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+          legend.text = element_text(size=8, colour = "black"),legend.position ="none") # cambiar texto leyenda   
+    
+fig1.2 <- ggplot(data=datos.multi %>% filter(Hospital=="KCH")) +
+  geom_point(aes(x=1:444, y=w.w, col=Hospital)) +
+  scale_colour_manual(values=c("#DB7093")) +
+  labs(subtitle = "b) KCH Weibull Fr.") + ylim(0.9, 1.05) + ylab("w[i]") + xlab("Patient ID") +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"),legend.position ="none") # cambiar texto leyenda   
+
+fig1.3 <- ggplot(data=datos.multi %>% filter(Hospital=="HCUV")) +
+  geom_point(aes(x=1:140, y=w.w, col=Hospital)) +
+  scale_colour_manual(values=c("#66CDAA")) +
+  labs(subtitle = "c) HCUV Weibull Fr.") + ylim(0.9, 1.05) + ylab("w[i]") + xlab("Patient ID") + 
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"),legend.position ="none") # cambiar texto leyenda  
+    
+fig1 <- ggplot(data = datos.multi) +
+  geom_density(aes(w.w), alpha=0.25, cex=1.05, col="black", fill="black") + xlab("w[i]") + ylab("Density") + xlim(0.85, 1.1) + labs(tag="d)") +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), legend.position = 0, # cambiar texto leyenda   
+        plot.tag.position = c(0,1), plot.tag = element_text(vjust = 1.5, hjust = -4))   
+    
+fig2 <- ggplot(data = datos.multi) +
+      geom_density(aes(w.w, fill=Hospital, col=Hospital), alpha=0.25, cex=1.05) + xlab("w[i]") + ylab("Density") + xlim(0.85, 1.1) +
+      scale_colour_manual(values=c("#4169E1", "#66CDAA","#DB7093")) +
+      scale_fill_manual(values=c("#4169E1", "#66CDAA","#DB7093")) + labs(tag="e)") +
+      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+            axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+            axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+            panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+            legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+            legend.text = element_text(size=8, colour = "black"),legend.position = c(0.9, 0.7), # cambiar texto leyenda   
+        plot.tag.position = c(0,1), plot.tag = element_text(vjust = 1.5, hjust = -3.5))
+
+
+grid.arrange(arrangeGrob(fig1.1, fig1.2, fig1.3, ncol=3), arrangeGrob(fig1, fig2, ncol=2), ncol=1)
+```
+
+### MPCF Frailty {.tabset}
+
+#### Load and Extract Data
+
+```{r}
+result <- as.mcmc(do.call(rbind, ULN.MPCF.FR.100K))
+w <- as.vector(rep(NA,725))
+
+for (i in 27:751){
+  w[i] <- mean(result[, i])
+}
+w <- as.data.frame(w, ncol=1)
+
+w <- drop_na(w)
+datos.multi$w.mpcf <- w$w
+ 
+beta1 <- result[, 1]
+beta2 <- result[, 2]
+
+lambda1.1 <- result[, 3]
+lambda2.1 <- result[, 4]
+lambda3.1 <- result[, 5]
+lambda4.1 <- result[, 6]
+lambda5.1 <- result[, 7]
+lambda6.1 <- result[, 8]
+lambda7.1 <- result[, 9]
+lambda8.1 <- result[, 10]
+lambda9.1 <- result[, 11]
+lambda10.1 <- result[, 12]
+lambda11.1 <- result[, 13]
+lambda12.1 <- result[, 14]
+
+lambda1.2 <- result[, 15]
+lambda2.2 <- result[, 16]
+lambda3.2 <- result[, 17]
+lambda4.2 <- result[, 18]
+lambda5.2 <- result[, 19]
+lambda6.2 <- result[, 20]
+lambda7.2 <- result[, 21]
+lambda8.2 <- result[, 22]
+lambda9.2 <- result[, 23]
+lambda10.2 <- result[, 24]
+lambda11.2 <- result[, 25]
+lambda12.2 <- result[, 26]
+
+# SUBSAMPLE TO SPEED UP COMPUTATION TIME
+samples.idx <- sample(1:nrow(result), 200)
+result.subsample <- result[samples.idx,]
+
+# EXTRACT DATA PER EVENT
+lambda.ACLF <- result.subsample[, 3:14]
+lambda.Trp <- result.subsample[, 15:26]
+```
+
+#### Figure 4.9
+
+```{r}
+table2 <- gelman.diag(ULN.MPCF.FR.100K, multivariate = TRUE)
+type <- c(rep("Point est.", length(table2$psrf[,1])), rep("Upper C.I.", length(table2$psrf[,1])))
+rhat <- data.frame(x = rep(1:length(table2$psrf[,1]), 2), Type = type, Rhat = c(as.numeric(table2$psrf[,1]), as.numeric(table2$psrf[,2])))
+
+ggplot(data = rhat) +
+  geom_point(aes(x=x, y=Rhat, col=Type), alpha=0.4) +
+  scale_colour_manual(values=c("#4169E1", "#DB7093")) + 
+  geom_hline(yintercept = 1.1, col="black") +
+  labs(x="Parameter Index", y="PSRF") +
+  labs(title="PSRF values for the parameters estimated") +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda
+```
+
+#### Figure 4.10
+
+#### Log-Baseline Hazard Function
+
+```{r}
+log.h0.ACLF <- log(lambda.ACLF)
+log.h0mean <- apply(log.h0.ACLF, 2, mean)
+log.h0q2.5 <- apply(log.h0.ACLF, 2, quantile, probs=0.025)
+log.h0q97.5 <- apply(log.h0.ACLF, 2, quantile, probs=0.975)
+
+df5 <- data.frame(time=rep(rep(a, 2)[-c(1,(J+1)*2)],1), h0med = c(rep(log.h0mean, 2)),h0lwr = c(rep(log.h0q2.5, 2)),h0upr= c(rep(log.h0q97.5, 2)))
+
+pp<-table(int.obs)
+df6<-data.frame(time=t,
+                h0lwr=c(rep(log.h0q2.5[1],pp[1]), rep(log.h0q2.5[2],pp[2]), rep(log.h0q2.5[3],pp[3]),
+                        rep(log.h0q2.5[4],pp[4]), rep(log.h0q2.5[5],pp[5]), rep(log.h0q2.5[6],pp[6]),
+                        rep(log.h0q2.5[7],pp[7]), rep(log.h0q2.5[8],pp[8]), rep(log.h0q2.5[9],pp[9]),
+                        rep(log.h0q2.5[10],pp[10]), rep(log.h0q2.5[11],pp[11]), rep(log.h0q2.5[12],pp[12])),
+                h0upr=c(rep(log.h0q97.5[1],pp[1]), rep(log.h0q97.5[2],pp[2]), rep(log.h0q97.5[3],pp[3]),
+                        rep(log.h0q97.5[4],pp[4]), rep(log.h0q97.5[5],pp[5]), rep(log.h0q97.5[6],pp[6]),
+                        rep(log.h0q97.5[7],pp[7]), rep(log.h0q97.5[8],pp[8]), rep(log.h0q97.5[9],pp[9]),
+                        rep(log.h0q97.5[10],pp[10]), rep(log.h0q97.5[11],pp[11]), rep(log.h0q97.5[12],pp[12])))
+
+log.h0.Trp <- log(lambda.Trp)
+log.h0mean <- apply(log.h0.Trp, 2, mean)
+log.h0q2.5 <- apply(log.h0.Trp, 2, quantile, probs=0.025)
+log.h0q97.5 <- apply(log.h0.Trp, 2, quantile, probs=0.975)
+
+df7 <- data.frame(time=rep(rep(a, 2)[-c(1,(J+1)*2)],1), h0med = c(rep(log.h0mean, 2)),h0lwr = c(rep(log.h0q2.5, 2)),h0upr= c(rep(log.h0q97.5, 2)))
+
+df8 <-data.frame(time=t,
+                h0lwr=c(rep(log.h0q2.5[1],pp[1]), rep(log.h0q2.5[2],pp[2]), rep(log.h0q2.5[3],pp[3]),
+                        rep(log.h0q2.5[4],pp[4]), rep(log.h0q2.5[5],pp[5]), rep(log.h0q2.5[6],pp[6]),
+                        rep(log.h0q2.5[7],pp[7]), rep(log.h0q2.5[8],pp[8]), rep(log.h0q2.5[9],pp[9]),
+                        rep(log.h0q2.5[10],pp[10]), rep(log.h0q2.5[11],pp[11]), rep(log.h0q2.5[12],pp[12])),
+                h0upr=c(rep(log.h0q97.5[1],pp[1]), rep(log.h0q97.5[2],pp[2]), rep(log.h0q97.5[3],pp[3]),
+                        rep(log.h0q97.5[4],pp[4]), rep(log.h0q97.5[5],pp[5]), rep(log.h0q97.5[6],pp[6]),
+                        rep(log.h0q97.5[7],pp[7]), rep(log.h0q97.5[8],pp[8]), rep(log.h0q97.5[9],pp[9]),
+                        rep(log.h0q97.5[10],pp[10]), rep(log.h0q97.5[11],pp[11]), rep(log.h0q97.5[12],pp[12])))
+
+fig1 <- ggplot() + 
+  scale_colour_manual(values=cols, name="Event") +
+  geom_errorbar(data=df8, mapping=aes(x=time, ymin=h0lwr, ymax=h0upr, colour="Transplant"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=df7, mapping=aes(x=time, y=h0med, colour="Transplant"), size=1) + 
+  geom_errorbar(data=df6, mapping=aes(x=time, ymin=h0lwr, ymax=h0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=df5, mapping=aes(x=time, y=h0med, colour="ACLF"), size=1) + 
+  labs(x="Time (days)", y="", subtitle = "a)Log Baseline Hazard Function") +
+  scale_linetype_manual(values = c("solid")) + 
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+        legend.position = c(0.9, 0.8)) # cambiar posicion leyenda      
+```
+
+#### Survival Baseline Function
+
+```{r}
+dH0<-matrix(NA,nrow(lambda.ACLF),length(t))
+    
+for(j in 1:nrow(lambda.ACLF)){
+  for(i in 1:length(t)){
+    dH0[j,i] <-ifelse(t[i]>a[2],(a[2]-a[1])*lambda.ACLF[j,1],0)+
+      ifelse(t[i]>a[3],(a[3]-a[2])*lambda.ACLF[j,2],0)+
+      ifelse(t[i]>a[4],(a[4]-a[3])*lambda.ACLF[j,3],0)+
+      ifelse(t[i]>a[5],(a[5]-a[4])*lambda.ACLF[j,4],0)+
+      ifelse(t[i]>a[6],(a[6]-a[5])*lambda.ACLF[j,5],0)+
+      ifelse(t[i]>a[7],(a[7]-a[6])*lambda.ACLF[j,6],0)+
+      ifelse(t[i]>a[8],(a[8]-a[7])*lambda.ACLF[j,7],0)+
+      ifelse(t[i]>a[9],(a[9]-a[8])*lambda.ACLF[j,8],0)+
+      ifelse(t[i]>a[10],(a[10]-a[9])*lambda.ACLF[j,9],0)+
+      ifelse(t[i]>a[11],(a[11]-a[10])*lambda.ACLF[j,10],0)+
+      ifelse(t[i]>a[12],(a[12]-a[11])*lambda.ACLF[j,11],0)+
+      ((t[i] - a[int.obs[i]]) *lambda.ACLF[j,int.obs[i]])
+  }
+  
+}
+
+S0 <- matrix(NA,nrow(lambda.ACLF),length(t))
+
+for(j in 1:nrow(lambda.ACLF)){
+  for (i in 1:length(t)) {
+    S0[j,i]<- exp(-(dH0[j,i]))
+  }
+}
+
+S0mean <- apply(S0, 2, mean, na.rm=TRUE)
+S0q2.5 <- apply(S0, 2, quantile, probs=0.025, na.rm=TRUE)
+S0q97.5 <- apply(S0, 2, quantile, probs=0.975, na.rm=TRUE) 
+S0.ACLF.MPCF <- data.frame(time=rep(t), S0med = c(S0mean), S0lwr=S0q2.5, S0upr=S0q97.5)
+
+dH0<-matrix(NA,nrow(lambda.Trp),length(t))
+    
+for(j in 1:nrow(lambda.Trp)){
+  for(i in 1:length(t)){
+    dH0[j,i] <-ifelse(t[i]>a[2],(a[2]-a[1])*lambda.Trp[j,1],0)+
+      ifelse(t[i]>a[3],(a[3]-a[2])*lambda.Trp[j,2],0)+
+      ifelse(t[i]>a[4],(a[4]-a[3])*lambda.Trp[j,3],0)+
+      ifelse(t[i]>a[5],(a[5]-a[4])*lambda.Trp[j,4],0)+
+      ifelse(t[i]>a[6],(a[6]-a[5])*lambda.Trp[j,5],0)+
+      ifelse(t[i]>a[7],(a[7]-a[6])*lambda.Trp[j,6],0)+
+      ifelse(t[i]>a[8],(a[8]-a[7])*lambda.Trp[j,7],0)+
+      ifelse(t[i]>a[9],(a[9]-a[8])*lambda.Trp[j,8],0)+
+      ifelse(t[i]>a[10],(a[10]-a[9])*lambda.Trp[j,9],0)+
+      ifelse(t[i]>a[11],(a[11]-a[10])*lambda.Trp[j,10],0)+
+      ifelse(t[i]>a[12],(a[12]-a[11])*lambda.Trp[j,11],0)+
+      ((t[i] - a[int.obs[i]]) *lambda.Trp[j,int.obs[i]])
+  }
+  
+}
+
+S0 <- matrix(NA,nrow(lambda.Trp),length(t))
+
+for(j in 1:nrow(lambda.Trp)){
+  for (i in 1:length(t)) {
+    S0[j,i]<- exp(-(dH0[j,i]))
+  }
+}
+
+S0mean <- apply(S0, 2, mean, na.rm=TRUE)
+S0q2.5 <- apply(S0, 2, quantile, probs=0.025, na.rm=TRUE)
+S0q97.5 <- apply(S0, 2, quantile, probs=0.975, na.rm=TRUE) 
+S0.Trp.MPCF <- data.frame(time=rep(t), S0med = c(S0mean), S0lwr=S0q2.5, S0upr=S0q97.5)
+
+fig2 <- ggplot() + 
+  scale_colour_manual(values=cols, name="Event") +
+  geom_errorbar(data=S0.ACLF.MPCF, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=S0.ACLF.MPCF, mapping=aes(x=time, y=S0med,colour="ACLF"), size=1) + 
+  geom_errorbar(data=S0.Trp.MPCF, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr,colour="Transplant"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=S0.Trp.MPCF, mapping=aes(x=time, y=S0med,colour="Transplant"), size=1) + 
+  labs(x="Time (days)", y="", subtitle="b) Baseline Survival Function Weib. Fr.") + 
+  ylim(0,1)+
+  xlim(0,2500) + 
+  scale_linetype_manual(values = c("solid")) + 
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+        legend.position = c(0.2, 0.2)) # cambiar posicion leyenda        
+
+grid.arrange(fig1, fig2, ncol=2) 
+```
+
+#### Figure 4.11
+
+```{r}
+fig1.1 <- ggplot(data=datos.multi %>% filter(Hospital=="RFH")) +
+    geom_point(aes(x=1:141, y=w.mpcf, col=Hospital)) +
+    scale_colour_manual(values=c("#4169E1")) +
+    labs(subtitle = "a) RFH MPCF Fr.") + ylim(0.9, 1.05) + ylab("w[i]") + xlab("Patient ID") +
+    theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+          axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+          axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+          panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+          legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+          legend.text = element_text(size=8, colour = "black"),legend.position ="none") # cambiar texto leyenda   
+    
+fig1.2 <- ggplot(data=datos.multi %>% filter(Hospital=="KCH")) +
+  geom_point(aes(x=1:444, y=w.mpcf, col=Hospital)) +
+  scale_colour_manual(values=c("#DB7093")) +
+  labs(subtitle = "b) KCH MPCF Fr.") + ylim(0.9, 1.05) + ylab("w[i]") + xlab("Patient ID") +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"),legend.position ="none") # cambiar texto leyenda   
+
+fig1.3 <- ggplot(data=datos.multi %>% filter(Hospital=="HCUV")) +
+  geom_point(aes(x=1:140, y=w.mpcf, col=Hospital)) +
+  scale_colour_manual(values=c("#66CDAA")) +
+  labs(subtitle = "c) HCUV MPCF Fr.") + ylim(0.9, 1.05) + ylab("w[i]") + xlab("Patient ID") + 
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"),legend.position ="none") # cambiar texto leyenda  
+    
+fig1 <- ggplot(data = datos.multi) +
+  geom_density(aes(w.mpcf), alpha=0.25, cex=1.05, col="black", fill="black") + xlab("w[i]") + ylab("Density") + xlim(0.85, 1.1) + labs(tag="d)") +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), legend.position = 0, # cambiar texto leyenda   
+        plot.tag.position = c(0,1), plot.tag = element_text(vjust = 1.5, hjust = -4))   
+    
+fig2 <- ggplot(data = datos.multi) +
+      geom_density(aes(w.mpcf, fill=Hospital, col=Hospital), alpha=0.25, cex=1.05) + xlab("w[i]") + ylab("Density") + xlim(0.85, 1.1) +
+      scale_colour_manual(values=c("#4169E1", "#66CDAA","#DB7093")) +
+      scale_fill_manual(values=c("#4169E1", "#66CDAA","#DB7093")) + labs(tag="e)") +
+      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+            axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+            axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+            panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+            legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+            legend.text = element_text(size=8, colour = "black"),legend.position = c(0.9, 0.7), # cambiar texto leyenda   
+        plot.tag.position = c(0,1), plot.tag = element_text(vjust = 1.5, hjust = -3.5))
+
+grid.arrange(arrangeGrob(fig1.1, fig1.2, fig1.3, ncol=3), arrangeGrob(fig1, fig2, ncol=2), ncol=1)
+```
+
+## Multivariable Models
+
+|       First, we need to load the Rdata files of the models.  Depending on the RAM memory of your computer, you may encounter a problem loading all of them at once.
+
+```{r}
+load("./Models RData/MULTI_W_MF_100K.Rdata")
+load("./Models RData/MULTI_MPCF_MF_100K.Rdata")
+```
+
+### Weibull
+
+#### Extract Data
+
+```{r}
+result <- as.mcmc(do.call(rbind, MULTI.W.MF.100K))
+
+alpha1 <- result[, 1]
+alpha2 <- result[, 2]
+
+beta1 <- result[, 3]
+beta2 <- result[, 4]
+
+lambda1 <- result[, 5]
+lambda2 <- result[, 6]
+
+# SUBSAMPLE TO SPEED UP COMPUTATION TIME
+samples.idx <- sample(1:nrow(result), 200)
+result.subsample <- result[samples.idx,]
+result.subsample <- as.data.frame(result.subsample)
+```
+
+#### Figure 5.1
+
+```{r}
+table <- gelman.diag(MULTI.W.MF.100K)
+type <- c(rep("Point est.", 30), rep("Upper C.I.", 30))
+rhat <- data.frame(x = rep(1:30, 2), Type = type, Rhat = c(as.numeric(table$psrf[,1]), as.numeric(table$psrf[,2])))
+
+ggplot(data = rhat) +
+  geom_point(aes(x=x, y=Rhat, col=Type), alpha=0.4) +
+  scale_colour_manual(values=c("#4169E1", "#DB7093")) + 
+  geom_hline(yintercept = 1.1, col="black") +
+  labs(x="Parameter Index", y="PSRF") +
+  labs(title="PSRF values for the parameters estimated") +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda  
+```
+
+### MPCF
+
+#### Extract Data
+
+```{r}
+result <- as.mcmc(do.call(rbind, MULTI.MPCF.MF.100K))
+
+alpha1 <- result[, 1]
+alpha2 <- result[, 2]
+
+beta1 <- result[, 3]
+beta2 <- result[, 4]
+
+lambda1 <- result[, 5]
+lambda2 <- result[, 6]
+
+# SUBSAMPLE TO SPEED UP COMPUTATION TIME
+samples.idx <- sample(1:nrow(result), 200)
+result.subsample <- result[samples.idx,]
+result.subsample <- as.data.frame(result.subsample)
+```
+
+#### Figure 5.1
+
+```{r}
+table <- gelman.diag(MULTI.MPCF.MF.100K)
+type <- c(rep("Point est.", 50), rep("Upper C.I.", 50))
+rhat <- data.frame(x = rep(1:50, 2), Type = type, Rhat = c(as.numeric(table$psrf[,1]), as.numeric(table$psrf[,2])))
+
+ggplot(data = rhat) +
+  geom_point(aes(x=x, y=Rhat, col=Type), alpha=0.4) +
+  scale_colour_manual(values=c("#4169E1", "#DB7093")) + 
+  geom_hline(yintercept = 1.1, col="black") +
+  labs(x="Parameter Index", y="PSRF") +
+  labs(title="PSRF values for the parameters estimated") +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black")) # cambiar texto leyenda  
+```
+
+## Discussion
+
+### Figure 6.1
+
+```{r}
+result.W <- as.mcmc(do.call(rbind, ULN.W.100K))
+result.W.FR <- as.mcmc(do.call(rbind, ULN.FR.100K))
+result.MPCF <- as.mcmc(do.call(rbind, ULN.MPCF.100K))
+result.MPCF.FR <- as.mcmc(do.call(rbind, ULN.MPCF.FR.100K))
+
+result.W.b1 <- result.W[, 3]
+result.W.b2 <- result.W[, 4]
+result.W.FR.b1 <- result.W.FR[, 3]
+result.W.FR.b2 <- result.W.FR[, 4]
+result.MPCF.b1 <- result.MPCF[, 1]
+result.MPCF.b2 <- result.MPCF[, 2]
+result.MPCF.FR.b1 <- result.MPCF.FR[, 1]
+result.MPCF.FR.b2 <- result.MPCF.FR[, 2]
+
+beta1.results <- data.frame("Model"=c("Weibull", "Weibull Fr.", "MPCF", "MCPF Fr."),
+                           "Mean" = c(mean(result.W.b1), mean(result.W.FR.b1), mean(result.MPCF.b1), mean(result.MPCF.FR.b1)), 
+                           "Lower" = c(quantile(result.W.b1, 0.025), quantile(result.W.FR.b1, 0.025), quantile(result.MPCF.b1, 0.025), quantile(result.MPCF.FR.b1, 0.025)), 
+                           "Upper"= c(quantile(result.W.b1, 0.975), quantile(result.W.FR.b1, 0.975), quantile(result.MPCF.b1, 0.975), quantile(result.MPCF.FR.b1, 0.975)))
+
+beta2.results <- data.frame("Model"=c("Weibull", "Weibull Fr.", "MPCF", "MCPF Fr."),
+                            "Mean" = c(mean(result.W.b2), mean(result.W.FR.b2), mean(result.MPCF.b2), mean(result.MPCF.FR.b2)), 
+                            "Lower" = c(quantile(result.W.b2, 0.025), quantile(result.W.FR.b2, 0.025), quantile(result.MPCF.b2, 0.025), quantile(result.MPCF.FR.b2, 0.025)), 
+                            "Upper"= c(quantile(result.W.b2, 0.975), quantile(result.W.FR.b2, 0.975), quantile(result.MPCF.b2, 0.975), quantile(result.MPCF.FR.b2, 0.975)))
+beta1.HR <- data.frame("Model"= beta1.results$Model, "Mean" = exp(beta1.results$Mean), "Lower" = exp(beta1.results$Upper), "Upper"= exp(beta1.results$Lower))
+beta2.HR <- data.frame("Model"= beta2.results$Model, "Mean" = exp(beta2.results$Mean), "Lower" = exp(beta2.results$Upper), "Upper"= exp(beta2.results$Lower))
+
+fig1 <- ggplot(beta1.results, aes(x=Model, y=Mean, col=Model)) + 
+  geom_point() + ylim(0, 1.5) + labs(subtitle="a) Regression Coefficients ACLF") +
+  scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA", "black")) +
+  geom_pointrange(aes(ymin=Lower, ymax=Upper)) + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda
+        legend.pos = c(0.9, 0.2))
+
+fig2 <- ggplot(beta2.results, aes(x=Model, y=Mean, col=Model)) + 
+  geom_point() + ylim(0, 1.5) + labs(subtitle="b) Regression Coefficients Transplant") +
+  scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA", "black")) +
+  geom_pointrange(aes(ymin=Lower, ymax=Upper)) + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda
+        legend.pos = c(0.9, 0.8))
+
+fig3 <- ggplot(beta1.HR, aes(x=Model, y=Mean, col=Model)) + 
+  geom_point(cex=2) + ylim(0, 3.5) + labs(subtitle="a) Hazards Ratio ACLF") +
+  scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA", "black")) +
+  geom_pointrange(aes(ymin=Lower, ymax=Upper)) + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda
+        legend.pos = c(0.9, 0.2)) # change legen position
+
+fig4 <- ggplot(beta2.HR, aes(x=Model, y=Mean, col=Model)) + 
+  geom_point(cex=2) + ylim(0, 3.5) + labs(subtitle="b) Hazards Ratio Transplant") + 
+  scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA", "black")) +
+  geom_pointrange(aes(ymin=Lower, ymax=Upper)) + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda
+        legend.pos = c(0.9, 0.8)) # change legen position
+
+grid.arrange(fig1, fig2, fig3, fig4, ncol=2)
+```
+
+### Figure 6.2
+
+```{r}
+fig1 <- ggplot() + 
+  scale_colour_manual(values=cols, name="Event") +
+  geom_errorbar(data=log.h0.ACLF.W.df, mapping=aes(x=time, ymin=log.h0lwr, ymax=log.h0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=log.h0.ACLF.W.df, mapping=aes(x=time, y=log.h0med,colour="ACLF"), size=1) +
+  geom_errorbar(data=log.h0.Trp.W.df, mapping=aes(x=time, ymin=log.h0lwr, ymax=log.h0upr, colour="Transplant"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=log.h0.Trp.W.df, mapping=aes(x=time, y=log.h0med,colour="Transplant"), size=1) + 
+  labs(x="Time (days)", y="", subtitle="a) Log Baseline Hazard Function Weibull") + ylim(-18,-6) +
+  scale_linetype_manual(values = c("solid")) + 
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+        legend.position = c(0.9, 0.2)) # cambiar posicion leyenda 
+
+fig2 <- ggplot() + 
+  scale_colour_manual(values=cols, name="Event") +
+  geom_errorbar(data=df4, mapping=aes(x=time, ymin=h0lwr, ymax=h0upr, colour="Transplant"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=df3, mapping=aes(x=time, y=h0med, colour="Transplant"), size=1) + 
+  geom_errorbar(data=df2, mapping=aes(x=time, ymin=h0lwr, ymax=h0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=df1, mapping=aes(x=time, y=h0med, colour="ACLF"), size=1) + 
+  labs(x="Time (days)", y="", subtitle = "b)Log Baseline Hazard Function MPCF") + ylim(-18,-6) +
+  scale_linetype_manual(values = c("solid")) + 
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+        legend.position = c(0.9, 0.85)) # cambiar posicion leyenda   
+
+fig3 <- ggplot() + 
+  scale_colour_manual(values=cols, name="Event") +
+  geom_errorbar(data=log.h0.ACLF.W.FR.df, mapping=aes(x=time, ymin=log.h0lwr, ymax=log.h0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=log.h0.ACLF.W.FR.df, mapping=aes(x=time, y=log.h0med,colour="ACLF"), size=1) + 
+  geom_errorbar(data=log.h0.Trp.W.FR.df, mapping=aes(x=time, ymin=log.h0lwr, ymax=log.h0upr, colour="Transplant"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=log.h0.Trp.W.FR.df, mapping=aes(x=time, y=log.h0med,colour="Transplant"), size=1) + 
+  labs(x="Time (days)", y="", subtitle="c) Log Baseline Hazard Function Weibull Frailty") + 
+  ylim(-18,-6) +
+  scale_linetype_manual(values = c("solid")) + 
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+        legend.position = c(0.9, 0.2)) # cambiar posicion leyenda 
+
+fig4 <- ggplot() + 
+  scale_colour_manual(values=cols, name="Event") +
+  geom_errorbar(data=df8, mapping=aes(x=time, ymin=h0lwr, ymax=h0upr, colour="Transplant"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=df7, mapping=aes(x=time, y=h0med, colour="Transplant"), size=1) + 
+  geom_errorbar(data=df6, mapping=aes(x=time, ymin=h0lwr, ymax=h0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+  geom_line(data=df5, mapping=aes(x=time, y=h0med, colour="ACLF"), size=1) + ylim(-18,-6) +
+  labs(x="Time (days)", y="", subtitle = "d)Log Baseline Hazard Function MPCF Frailty") +
+  scale_linetype_manual(values = c("solid")) + 
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+        legend.position = c(0.9, 0.85)) # cambiar posicion leyenda  
+
+grid.arrange(fig1, fig2, fig3, fig4, ncol=2)
+```
+
+
+### Figure 6.3
+
+```{r}
+fig1 <- ggplot() + 
+      scale_colour_manual(values=cols, name="Event") +
+      geom_errorbar(data=S0.ACLF.df, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+      geom_line(data=S0.ACLF.df, mapping=aes(x=time, y=S0med,colour="ACLF"), size=1) + 
+      geom_errorbar(data=S0.Trp.df, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr,colour="Transplant"), width=0, size=3, alpha=0.05) + 
+      geom_line(data=S0.Trp.df, mapping=aes(x=time, y=S0med,colour="Transplant"), size=1) + 
+      labs(x="Time (days)", y="", subtitle="a) Baseline Survival Function Weib.") + 
+      ylim(0,1)+
+      xlim(0,2500) + 
+      scale_linetype_manual(values = c("solid")) + 
+      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+            axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+            axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+            panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+            legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+            legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+            legend.position = c(0.2, 0.2)) # cambiar posicion leyenda        
+    
+    fig2 <- ggplot() + 
+      scale_colour_manual(values=cols, name="Event") +
+      geom_errorbar(data=S0.FR.ACLF.df, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+      geom_line(data=S0.FR.ACLF.df, mapping=aes(x=time, y=S0med,colour="ACLF"), size=1) + 
+      geom_errorbar(data=S0.FR.Trp.df, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr,colour="Transplant"), width=0, size=3, alpha=0.05) + 
+      geom_line(data=S0.FR.Trp.df, mapping=aes(x=time, y=S0med,colour="Transplant"), size=1) + 
+      labs(x="Time (days)", y="", subtitle="c) Baseline Survival Function Weib. Fr.") + 
+      ylim(0,1)+
+      xlim(0,2500) + 
+      scale_linetype_manual(values = c("solid")) + 
+      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+            axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+            axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+            panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+            legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+            legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+            legend.position = c(0.2, 0.2)) # cambiar posicion leyenda        
+    
+    fig3 <- ggplot() + 
+      scale_colour_manual(values=cols, name="Event") +
+      geom_errorbar(data=S0.ACLF.MPCF, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+      geom_line(data=S0.ACLF.MPCF, mapping=aes(x=time, y=S0med,colour="ACLF"), size=1) + 
+      geom_errorbar(data=S0.Trp.MPCF, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr,colour="Transplant"), width=0, size=3, alpha=0.05) + 
+      geom_line(data=S0.Trp.MPCF, mapping=aes(x=time, y=S0med,colour="Transplant"), size=1) + 
+      labs(x="Time (days)", y="", subtitle="b) Baseline Survival Function MPCF") + 
+      ylim(0,1)+
+      xlim(0,2500) + 
+      scale_linetype_manual(values = c("solid")) + 
+      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+            axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+            axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+            panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+            legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+            legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+            legend.position = c(0.2, 0.2)) # cambiar posicion leyenda       
+    
+    
+    fig4 <- ggplot() + 
+      scale_colour_manual(values=cols, name="Event") +
+      geom_errorbar(data=S0.ACLF.MPCF, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr, colour="ACLF"), width=0, size=3, alpha=0.05) + 
+      geom_line(data=S0.ACLF.MPCF, mapping=aes(x=time, y=S0med,colour="ACLF"), size=1) + 
+      geom_errorbar(data=S0.Trp.MPCF, mapping=aes(x=time, ymin=S0lwr, ymax=S0upr,colour="Transplant"), width=0, size=3, alpha=0.05) + 
+      geom_line(data=S0.Trp.MPCF, mapping=aes(x=time, y=S0med,colour="Transplant"), size=1) + 
+      labs(x="Time (days)", y="", subtitle="d) Baseline Survival Function MPCF  Fr.") + 
+      ylim(0,1)+
+      xlim(0,2500) + 
+      scale_linetype_manual(values = c("solid")) + 
+      theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+            axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+            axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+            panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+            legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+            legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+            legend.position = c(0.2, 0.2)) # cambiar posicion leyenda    
+    
+    grid.arrange(fig1, fig3, fig2, fig4, ncol=2)
+```
+
+### Figure 6.4
+
+```{r}
+fig1 <- ggplot(data = datos.multi) +
+    geom_density(aes(w.w, fill=Hospital, col=Hospital), alpha=0.25, cex=1.05) + xlab("w[i]") + ylab("Density") + xlim(0.85, 1.1) +
+    labs(subtitle = "a) Weibull") +
+    scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+    scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+    theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+          axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+          axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+          panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+          legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+          legend.text = element_text(size=8, colour = "black"),legend.position = c(0.9, 0.8)) # cambiar texto leyenda     
+  
+fig2 <- ggplot(data = datos.multi) +
+  geom_density(aes(w.mpcf, fill=Hospital, col=Hospital), alpha=0.25, cex=1.05) + xlab("w[i]") + ylab("Density") + xlim(0.85, 1.1) +
+  labs(subtitle = "b) MPCF") +
+  scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+  scale_fill_manual(values=c("#4169E1","#DB7093", "#66CDAA")) +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"),legend.position = c(0.9, 0.8)) # cambiar texto leyenda     
+
+grid.arrange(fig1, fig2, ncol=2)
+```
+
+### Figure 6.5
+
+```{r}
+result.W.multi <- as.mcmc(do.call(rbind, MULTI.W.MF.100K))
+result.W.multi.b1 <- result.W.multi[, 3]
+result.W.multi.b2 <- result.W.multi[, 4]
+result.W.multi.b3 <- result.W.multi[, 5]
+result.W.multi.b4 <- result.W.multi[, 6]
+result.W.multi.b5 <- result.W.multi[, 7]
+result.W.multi.b6 <- result.W.multi[, 8]
+result.W.multi.b7 <- result.W.multi[, 9]
+result.W.multi.b8 <- result.W.multi[, 10]
+result.W.multi.b9 <- result.W.multi[, 11]
+result.W.multi.b10 <- result.W.multi[, 12]
+result.W.multi.b11 <- result.W.multi[, 13]
+result.W.multi.b12 <- result.W.multi[, 14]
+result.W.multi.b13 <- result.W.multi[, 15]
+
+
+
+result.MPCF.multi <- as.mcmc(do.call(rbind, MULTI.MPCF.MF.100K))
+result.MPCF.multi.b1 <- result.MPCF.multi[, 1]
+result.MPCF.multi.b2 <- result.MPCF.multi[, 2]
+result.MPCF.multi.b3 <- result.MPCF.multi[, 3]
+result.MPCF.multi.b4 <- result.MPCF.multi[, 4]
+result.MPCF.multi.b5 <- result.MPCF.multi[, 5]
+result.MPCF.multi.b6 <- result.MPCF.multi[, 6]
+result.MPCF.multi.b7 <- result.MPCF.multi[, 7]
+result.MPCF.multi.b8 <- result.MPCF.multi[, 8]
+result.MPCF.multi.b9 <- result.MPCF.multi[, 9]
+result.MPCF.multi.b10 <- result.MPCF.multi[, 10]
+result.MPCF.multi.b11 <- result.MPCF.multi[, 11]
+result.MPCF.multi.b12 <- result.MPCF.multi[, 12]
+result.MPCF.multi.b13 <- result.MPCF.multi[, 13]
+
+
+beta1.results <- data.frame("Model"=c(rep("Weibull", 13), rep("MPCF", 13)),
+                            "Mean" = c(mean(result.W.multi.b1), mean(result.W.multi.b2), mean(result.W.multi.b3), mean(result.W.multi.b4), mean(result.W.multi.b5), mean(result.W.multi.b6), 
+                                       mean(result.W.multi.b7), mean(result.W.multi.b8), mean(result.W.multi.b9), mean(result.W.multi.b10), mean(result.W.multi.b11), mean(result.W.multi.b12), mean(result.W.multi.b13), 
+                                       mean(result.MPCF.multi.b1), mean(result.MPCF.multi.b2), mean(result.MPCF.multi.b3), mean(result.MPCF.multi.b4), mean(result.MPCF.multi.b5), mean(result.MPCF.multi.b6), 
+                                       mean(result.MPCF.multi.b7), mean(result.MPCF.multi.b8), mean(result.MPCF.multi.b9), mean(result.MPCF.multi.b10), mean(result.MPCF.multi.b11), mean(result.MPCF.multi.b12), mean(result.MPCF.multi.b13)), 
+                            "Lower" = c(quantile(result.W.multi.b1, 0.025), quantile(result.W.multi.b2, 0.025), quantile(result.W.multi.b3, 0.025), quantile(result.W.multi.b4, 0.025), quantile(result.W.multi.b5, 0.025), 
+                                        quantile(result.W.multi.b6, 0.025), quantile(result.W.multi.b7, 0.025), quantile(result.W.multi.b8, 0.025), quantile(result.W.multi.b9, 0.025), quantile(result.W.multi.b10, 0.025), 
+                                        quantile(result.W.multi.b11, 0.025), quantile(result.W.multi.b12, 0.025), quantile(result.W.multi.b13, 0.025), 
+                                        quantile(result.MPCF.multi.b1, 0.025), quantile(result.MPCF.multi.b2, 0.025), quantile(result.MPCF.multi.b3, 0.025), quantile(result.MPCF.multi.b4, 0.025), quantile(result.MPCF.multi.b5, 0.025), 
+                                        quantile(result.MPCF.multi.b6, 0.025), quantile(result.MPCF.multi.b7, 0.025), quantile(result.MPCF.multi.b8, 0.025), quantile(result.MPCF.multi.b9, 0.025), quantile(result.MPCF.multi.b10, 0.025), 
+                                        quantile(result.MPCF.multi.b11, 0.025), quantile(result.MPCF.multi.b12, 0.025), quantile(result.MPCF.multi.b13, 0.025)), 
+                            "Upper"= c(quantile(result.W.multi.b1, 0.975), quantile(result.W.multi.b2, 0.975), quantile(result.W.multi.b3, 0.975), quantile(result.W.multi.b4, 0.975), quantile(result.W.multi.b5, 0.975), 
+                                       quantile(result.W.multi.b6, 0.975), quantile(result.W.multi.b7, 0.975), quantile(result.W.multi.b8, 0.975), quantile(result.W.multi.b9, 0.975), quantile(result.W.multi.b10, 0.975), 
+                                       quantile(result.W.multi.b11, 0.975), quantile(result.W.multi.b12, 0.975), quantile(result.W.multi.b13, 0.975), 
+                                       quantile(result.MPCF.multi.b1, 0.975), quantile(result.MPCF.multi.b2, 0.975), quantile(result.MPCF.multi.b3, 0.975), quantile(result.MPCF.multi.b4, 0.975), quantile(result.MPCF.multi.b5, 0.975), 
+                                       quantile(result.MPCF.multi.b6, 0.975), quantile(result.MPCF.multi.b7, 0.975), quantile(result.MPCF.multi.b8, 0.975), quantile(result.MPCF.multi.b9, 0.975), quantile(result.MPCF.multi.b10, 0.975), 
+                                       quantile(result.MPCF.multi.b11, 0.975), quantile(result.MPCF.multi.b12, 0.975), quantile(result.MPCF.multi.b13, 0.975)),
+                            "Covariate" = rep(c("ULN", "AlbgDL", "Diabetes", "AC-Viral", "AC-Autoinmune", "AC-NAFLD", "AC-Other", "INR", "Bblockers", "Sex", "Cr", "Br", "Age"), 2))
+
+
+ggplot(beta1.results, aes(x=Covariate, y=Mean, col=Model)) + 
+  facet_grid(cols=vars(Model)) +
+  geom_point() +
+  scale_colour_manual(values=c("#4169E1","#DB7093", "#66CDAA", "black")) +
+  geom_pointrange(aes(ymin=Lower, ymax=Upper)) + #cambiar etiquetas ejes
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda
+        legend.pos = c(0.9, 0.2),
+        axis.text.x = element_text(angle = 75, vjust = 1, hjust=1))    
+```
+
+## Future Work
+
+### Figure 8.1
+
+```{r}
+load("./DICs/M0_W_FR_DIC.Rdata"); load("./DICs/M0_W_DIC.Rdata"); load("./DICs/M0_MPCF_DIC.Rdata"); load("./DICs/M0_MPCF_FR_DIC.Rdata")
+load("./DICs/M1_W_FR_DIC.Rdata"); load("./DICs/M1_W_DIC.Rdata"); load("./DICs/M1_MPCF_DIC.Rdata"); load("./DICs/M1_MPCF_FR_DIC.Rdata")
+load("./DICs/M2_W_FR_DIC.Rdata"); load("./DICs/M2_W_DIC.Rdata"); load("./DICs/M2_MPCF_DIC.Rdata"); load("./DICs/M2_MPCF_FR_DIC.Rdata")
+load("./DICs/M3_W_FR_DIC.Rdata"); load("./DICs/M3_W_DIC.Rdata"); load("./DICs/M3_MPCF_DIC.Rdata"); load("./DICs/M3_MPCF_FR_DIC.Rdata")
+load("./DICs/M4_W_FR_DIC.Rdata"); load("./DICs/M4_W_DIC.Rdata"); load("./DICs/M4_MPCF_DIC.Rdata"); load("./DICs/M4_MPCF_FR_DIC.Rdata")
+load("./DICs/M5_W_FR_DIC.Rdata"); load("./DICs/M5_W_DIC.Rdata"); load("./DICs/M5_MPCF_DIC.Rdata"); load("./DICs/M5_MPCF_FR_DIC.Rdata")
+load("./DICs/M6_W_FR_DIC.Rdata"); load("./DICs/M6_W_DIC.Rdata"); load("./DICs/M6_MPCF_DIC.Rdata"); load("./DICs/M6_MPCF_FR_DIC.Rdata")
+load("./DICs/M7_W_FR_DIC.Rdata"); load("./DICs/M7_W_DIC.Rdata"); load("./DICs/M7_MPCF_DIC.Rdata"); load("./DICs/M7_MPCF_FR_DIC.Rdata")
+load("./DICs/M8_W_FR_DIC.Rdata"); load("./DICs/M8_W_DIC.Rdata"); load("./DICs/M8_MPCF_DIC.Rdata"); load("./DICs/M8_MPCF_FR_DIC.Rdata")
+load("./DICs/M9_W_FR_DIC.Rdata"); load("./DICs/M9_W_DIC.Rdata"); load("./DICs/M9_MPCF_DIC.Rdata"); load("./DICs/M9_MPCF_FR_DIC.Rdata")
+load("./DICs/MS_W_FR_DIC.Rdata"); load("./DICs/MS_W_DIC.Rdata"); load("./DICs/MS_MPCF_DIC.Rdata"); load("./DICs/MS_MPCF_FR_DIC.Rdata")
+
+dic.models <- data.frame("Model" = rep(c("Model 0", "Model 1", "Model 2", "Model 3", "Model 4", "Model 5", "Model 6", "Model 7", "Model 8", "Model 9", "Model S"),4), 
+                         "DIC" = c(sum(M0.W.DIC$deviance), sum(M1.W.DIC$deviance), sum(M2.W.DIC$deviance), sum(M3.W.DIC$deviance), sum(M4.W.DIC$deviance), sum(M5.W.DIC$deviance), 
+                                   sum(M6.W.DIC$deviance), sum(M7.W.DIC$deviance), sum(M8.W.DIC$deviance), sum(M9.W.DIC$deviance), sum(MS.W.DIC$deviance), 
+                                   sum(M0.MPCF.DIC$deviance), sum(M1.MPCF.DIC$deviance), sum(M2.MPCF.DIC$deviance), sum(M3.MPCF.DIC$deviance), sum(M4.MPCF.DIC$deviance), sum(M5.MPCF.DIC$deviance), 
+                                   sum(M6.MPCF.DIC$deviance), sum(M7.MPCF.DIC$deviance), sum(M8.MPCF.DIC$deviance), sum(M9.MPCF.DIC$deviance), sum(MS.MPCF.DIC$deviance), 
+                                   sum(M0.W.FR.DIC$deviance), sum(M1.W.FR.DIC$deviance), sum(M2.W.FR.DIC$deviance), sum(M3.W.FR.DIC$deviance), sum(M4.W.FR.DIC$deviance), sum(M5.W.FR.DIC$deviance), 
+                                   sum(M6.W.FR.DIC$deviance), sum(M7.W.FR.DIC$deviance), sum(M8.W.FR.DIC$deviance), sum(M9.W.FR.DIC$deviance), sum(MS.W.FR.DIC$deviance), 
+                                   sum(M0.MPCF.FR.DIC$deviance), sum(M1.MPCF.FR.DIC$deviance), sum(M2.MPCF.FR.DIC$deviance), sum(M3.MPCF.FR.DIC$deviance), sum(M4.MPCF.FR.DIC$deviance), sum(M5.MPCF.FR.DIC$deviance), 
+                                   sum(M6.MPCF.FR.DIC$deviance), sum(M7.MPCF.FR.DIC$deviance), sum(M8.MPCF.FR.DIC$deviance), sum(M9.MPCF.FR.DIC$deviance), sum(MS.MPCF.FR.DIC$deviance)), 
+                         "Type" = c(rep("Weibull", 11), rep("MPCF", 11), rep("Weibull Fr.", 11), rep("MPCF Fr.", 11)))
+
+table <- data.frame("Model" = c("Model Sat.", "Model 1", "Model 2", "Model Sat. FR", "Model 1 FR"), "Variables" = c("ULN + Age + MELD + AlbgDL + Br + INR + Cr + AetiologyCat + ChilPughclass + Sex + Diabetes", "ULN + AlbgDL + ChilPughclass + Diabetes", "ULN + AlbgDL + ChilPughclass + Diabetes + MELD + AetiologyCat","ULN + Age + MELD + AlbgDL + Br + INR + Cr + AetiologyCat + ChilPughclass + Sex + Diabetes", "ULN + AlbgDL + ChilPughclass + Diabetes" ))
+
+kable(table, caption="Models") %>% kable_styling(position="center")
+dic.models$DIC <- dic.models$DIC - 145000000
+dic.models$Best <- rep("No", 44)
+dic.models$Best[c(11,22,30,43)] <- "Yes"
+
+ggplot(data = dic.models) +
+  geom_point(aes(y=DIC, x=Model, col=Type, size=Best)) + scale_size_manual(values=c(4,7)) +
+  theme(plot.title = element_text(size=14, face= "bold", colour= "grey43", hjust = 0.5), #cambiar estilo titulo
+        axis.title.x = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje x
+        axis.title.y = element_text(size=14, face="bold", colour = "black"), #cambiar estilo eje y
+        panel.border = element_rect(colour = "black", fill=NA, size=0.3), #cambiar bordes grafico
+        legend.title = element_text(size=10, face="bold", colour = "black"), # cambiar título leyenda
+        legend.text = element_text(size=8, colour = "black"), # cambiar texto leyenda     
+        legend.position = c(0.8, 0.8)) # cambiar posicion leyenda    
+```
+
+
+
+
+
+
